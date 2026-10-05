@@ -158,7 +158,7 @@ async function start() {
     window.FirebaseSync.user = user || null; setUser(user);
     if (!authStateResolved) { authStateResolved = true; window.__resolveFirebaseAuth?.(!!user); }
     if (user) { setStatus("Autenticado · conectando...", "syncing"); startFirestore(app,user); if (window.__entressafraAuthLocked) location.reload(); }
-    else { unsubscribeSnapshot?.(); unsubscribeSnapshot=null; workspaceRef=null; window.FirebaseSync.connected=false; setStatus("Login necessário para sincronizar", "offline"); window.__resolveFirebaseSync?.(false); }
+    else { unsubscribeSnapshot?.(); unsubscribeSnapshot=null; workspaceRef=null; window.FirebaseSync.connected=false; setStatus("Login necessário para sincronizar", "offline"); window.__resolveFirebaseSync?.(false); if (window.__entressafraAppReady) location.reload(); }
   });
 }
 

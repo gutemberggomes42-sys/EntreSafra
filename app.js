@@ -861,7 +861,7 @@ async function init() {
     ensureAxiagroPhoneStock();
     migrateAxiagroControlsToStock();
     state.route = MODULES[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
-    bindGlobalEvents(); nav(); render();
+    bindGlobalEvents(); nav(); render(); window.__entressafraAppReady = true;
   } catch (error) {
     $("#app").innerHTML = `<div class="empty-state"><strong>Não foi possível abrir os dados</strong>Inicie o sistema pelo servidor local para carregar a base da planilha.<br><small>${escapeHtml(error.message)}</small></div>`;
   }
