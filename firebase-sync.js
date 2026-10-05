@@ -23,6 +23,7 @@ const KEYS = {
 };
 const CLOUD_STAMP = "entressafra-firebase-updated-at";
 let timer = null;
+let pendingSync = false;
 let applyingRemote = false;
 let workspaceRef = null;
 let auth = null;
@@ -72,11 +73,13 @@ function applyRemote(data) {
 }
 
 async function pushNow() {
-  if (!workspaceRef || applyingRemote) return;
+  if (applyingRemote) return;
+  if (!workspaceRef) { pendingSync = true; return; }
   const updatedAtMs = Date.now();
   setStatus("Sincronizando com Firebase...", "syncing");
   try {
     await setDoc(workspaceRef, { ...readLocal(), updatedAtMs, updatedBy: navigator.userAgent.slice(0,120), schemaVersion: 2 });
+    pendingSync = false;
     localStorage.setItem(CLOUD_STAMP, String(updatedAtMs));
     setStatus("Firebase sincronizado", "online");
   } catch (error) {
@@ -87,6 +90,7 @@ async function pushNow() {
 
 function queue() {
   if (applyingRemote) return;
+  pendingSync = true;
   clearTimeout(timer);
   timer = setTimeout(pushNow, 700);
 }
@@ -120,6 +124,7 @@ async function startFirestore(app, user) {
     });
     window.FirebaseSync.connected = true;
     window.__resolveFirebaseSync?.(true);
+    if (pendingSync) queue();
   } catch (error) {
     console.warn("Firebase: conexão indisponível.", error.code || error.message);
     setStatus("Offline · dados locais ativos", "offline");
