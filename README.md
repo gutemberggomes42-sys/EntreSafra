@@ -15,6 +15,7 @@ Dê dois cliques em `index.html`. O sistema funciona diretamente no navegador e 
 - visualização operacional em tabela ou quadro Kanban;
 - módulos de plantio, caminhões, carretas, colhedoras, tratores, transbordos, vivências e CCI;
 - documentação de caminhões e carretas;
+- central documental de caminhões com vencimentos, alertas, CRLV, ANTT, tacógrafo, completude, filtros rápidos e visualização em cartões ou tabela;
 - controle de rádios e curva S;
 - módulo AXIAGRO com controle de celulares, suportes, lacres, fusíveis, endereços MAC e estoque;
 - distribuição de funcionários por local, com base de ativos, cadastro e movimentação entre equipes;

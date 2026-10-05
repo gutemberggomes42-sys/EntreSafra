@@ -45,7 +45,7 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -339,6 +339,39 @@ function renderModule(module) {
     </section>`;
 }
 
+function truckDocumentStatus(row) {
+  const text = slug(row.vencimento);
+  const date = parseDate(row.vencimento);
+  const days = date ? Math.ceil((date - new Date()) / 86400000) : null;
+  if (text.includes("vencido") || (days !== null && days < 0)) return { key:"Vencidos", label:"Vencido", tone:"danger", days };
+  if (text.includes("verificar") || text.includes("acidente") || !row.vencimento) return { key:"Revisar", label:"Revisar", tone:"pending", days };
+  if (days !== null && days <= 90) return { key:"90 dias", label:`Vence em ${days} dias`, tone:"pending", days };
+  return { key:"Válidos", label:"Válido", tone:"done", days };
+}
+
+function documentCompleteness(row) {
+  const fields = ["frota","placa","operacao","dataAfericao","vencimento","possuiCrlv","anoCrlv","antt","tacografo"];
+  return Math.round(fields.filter(field=>!isBlank(row[field])).length/fields.length*100);
+}
+
+function renderTruckDocuments() {
+  const source = state.data.modules.caminhoesInfo || [];
+  const query = slug(state.query);
+  const enriched = source.map(row=>({ ...row, _docStatus:truckDocumentStatus(row), _complete:documentCompleteness(row) }));
+  const expired = enriched.filter(row=>row._docStatus.key==="Vencidos").length;
+  const upcoming = enriched.filter(row=>row._docStatus.key==="90 dias").length;
+  const noCrlv = enriched.filter(row=>slug(row.possuiCrlv)!=="sim").length;
+  const pending = enriched.filter(row=>row._docStatus.key==="Revisar" || /pendente|verificar|aguardando|acidente/i.test(`${row.orcamento} ${row.pintura}`)).length;
+  let rows = enriched.filter(row=>!query || slug(Object.values(row).join(" ")).includes(query));
+  if (state.documentFilter === "Vencidos") rows=rows.filter(row=>row._docStatus.key==="Vencidos");
+  if (state.documentFilter === "90 dias") rows=rows.filter(row=>row._docStatus.key==="90 dias");
+  if (state.documentFilter === "Sem CRLV") rows=rows.filter(row=>slug(row.possuiCrlv)!=="sim");
+  if (state.documentFilter === "Pendências") rows=rows.filter(row=>row._docStatus.key==="Revisar" || /pendente|verificar|aguardando|acidente/i.test(`${row.orcamento} ${row.pintura}`));
+  if (state.documentFilter === "Completos") rows=rows.filter(row=>row._complete>=90);
+  rows.sort((a,b)=>(a._docStatus.days??99999)-(b._docStatus.days??99999));
+  return `${pageHeading("Documentos de caminhões","Central de conformidade documental, vencimentos, CRLV, ANTT e tacógrafos da frota.")}<div class="metrics"><article class="metric"><span class="label">Veículos monitorados</span><strong>${source.length}</strong><small>base documental completa</small></article><article class="metric danger"><span class="label">Vencidos</span><strong>${expired}</strong><small>exigem regularização</small></article><article class="metric warning"><span class="label">Próximos 90 dias</span><strong>${upcoming}</strong><small>programar renovação</small></article><article class="metric"><span class="label">Pendências documentais</span><strong>${pending}</strong><small>${noCrlv} sem CRLV confirmado</small></article></div><section class="panel truck-documents"><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, placa ou operação"></label><div class="document-filters">${["Todos","Vencidos","90 dias","Sem CRLV","Pendências","Completos"].map(value=>`<button class="filter-chip ${state.documentFilter===value?'active':''}" data-document-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><div class="view-toggle"><button class="${state.documentView==='cards'?'active':''}" data-document-view="cards" title="Cartões">▦</button><button class="${state.documentView==='table'?'active':''}" data-document-view="table" title="Tabela">▤</button></div><span class="badge">${rows.length} veículos</span></div>${state.documentView==='cards'?`<div class="document-grid">${rows.map(row=>`<article class="document-card ${row._docStatus.tone}"><button class="document-card-main" data-open="caminhoesInfo|${row.id}"><header><div><span class="eyebrow">Frota ${escapeHtml(row.frota)}</span><h3>${escapeHtml(row.placa||'Sem placa')}</h3></div>${badge(row._docStatus.label)}</header><p>${escapeHtml(row.operacao||'Operação não informada')} · ${escapeHtml(row.ano||'Ano não informado')}</p><div class="doc-chips"><span class="${slug(row.possuiCrlv)==='sim'?'ok':'missing'}">CRLV ${escapeHtml(row.anoCrlv||'—')}</span><span class="${!isBlank(row.antt)?'ok':'missing'}">ANTT</span><span class="${!isBlank(row.tacografo)?'ok':'missing'}">Tacógrafo</span></div><div class="completeness"><span><i style="width:${row._complete}%"></i></span><small>${row._complete}% completo</small></div><footer><span>Vencimento</span><strong>${formatValue(row.vencimento,'vencimento')}</strong></footer></button><button class="document-edit" data-edit="caminhoesInfo|${row.id}">Editar documentos</button></article>`).join('')}</div>`:`<div class="table-wrap"><table><thead><tr><th>Frota</th><th>Placa</th><th>Operação</th><th>Vencimento</th><th>CRLV</th><th>ANTT</th><th>Tacógrafo</th><th>Completude</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr data-open="caminhoesInfo|${row.id}"><td><strong>${escapeHtml(row.frota)}</strong></td><td>${escapeHtml(row.placa)}</td><td>${escapeHtml(row.operacao)}</td><td>${badge(row._docStatus.label)}</td><td>${badge(row.possuiCrlv||'Não informado')}</td><td>${formatValue(row.antt,'antt')}</td><td>${formatValue(row.tacografo,'tacografo')}</td><td><span class="badge">${row._complete}%</span></td><td><button class="row-action" data-edit="caminhoesInfo|${row.id}">•••</button></td></tr>`).join('')}</tbody></table></div>`}${!rows.length?`<div class="empty-state"><strong>Nenhum veículo encontrado</strong>Ajuste a busca ou os filtros documentais.</div>`:''}</section>`;
+}
+
 function renderAxiagro() {
   const controls = state.data.modules.axiagroControle || [];
   const stock = state.data.modules.axiagroEstoque || [];
@@ -442,7 +475,7 @@ function renderRaw() {
 function render() {
   $("#breadcrumb").textContent = MODULES[state.route].label;
   $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "activity", "raw"].includes(state.route));
-  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
+  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
 }
@@ -460,6 +493,8 @@ function bindViewEvents() {
   if (statusFilter) statusFilter.addEventListener("change", event => { state.status = event.target.value; state.page = 1; render(); });
   $$('[data-page]').forEach(button => button.addEventListener("click", () => { state.page = Number(button.dataset.page); render(); }));
   $$('[data-view]').forEach(button => button.addEventListener("click", () => { state.viewMode = button.dataset.view; render(); }));
+  $$('[data-document-filter]').forEach(button => button.addEventListener("click", () => { state.documentFilter=button.dataset.documentFilter; render(); }));
+  $$('[data-document-view]').forEach(button => button.addEventListener("click", () => { state.documentView=button.dataset.documentView; render(); }));
   $$('[data-sort]').forEach(button => button.addEventListener("click", () => { const column=button.dataset.sort; state.sortDir=state.sortBy===column&&state.sortDir==='asc'?'desc':'asc'; state.sortBy=column; state.page=1; render(); }));
   $("[data-page-size]")?.addEventListener("change", event => { state.pageSize=Number(event.target.value); state.page=1; render(); });
   $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.query = ""; render(); }));
