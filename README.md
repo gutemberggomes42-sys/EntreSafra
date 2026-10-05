@@ -17,6 +17,7 @@ Dê dois cliques em `index.html`. O sistema funciona diretamente no navegador e 
 - controle de rádios e curva S;
 - módulo AXIAGRO com controle de celulares, suportes, lacres, fusíveis, endereços MAC e estoque;
 - distribuição de funcionários por local, com base de ativos, cadastro e movimentação entre equipes;
+- equipes personalizadas editáveis, com busca por nome e preservação permanente do cadastro dos funcionários;
 - busca, filtros, cadastro, edição e exclusão lógica;
 - tema claro e escuro e interface responsiva para computador e celular;
 - histórico local de inclusões, edições e exclusões;

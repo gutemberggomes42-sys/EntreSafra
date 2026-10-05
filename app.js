@@ -43,11 +43,12 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
 const AUDIT_KEY = "entressafra-v1-audit";
+const TEAMS_KEY = "entressafra-v1-teams";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -342,6 +343,21 @@ function renderAxiagro() {
     </section>`;
 }
 
+function renderTeams(source) {
+  const teams = stored(TEAMS_KEY, []);
+  const employeeById = new Map(source.map(employee => [employee.id, employee]));
+  const selected = teams.find(team => team.id === state.selectedTeam);
+  if (selected) {
+    const members = (selected.members || []).map(id => employeeById.get(id)).filter(Boolean);
+    const available = source.filter(employee => !(selected.members || []).includes(employee.id));
+    return `<div class="team-detail-head"><button class="secondary-button" data-team-back>← Todas as equipes</button><div><span class="eyebrow">Equipe personalizada</span><h2>${escapeHtml(selected.name)}</h2><p>${escapeHtml(selected.location || "Local não definido")}${selected.leader ? ` · Responsável: ${escapeHtml(selected.leader)}` : ""}</p></div><div class="heading-actions"><button class="secondary-button" data-team-edit="${selected.id}">Editar equipe</button><button class="danger-button" data-team-delete="${selected.id}">Apagar lista</button></div></div>
+      ${selected.description ? `<div class="team-note">${escapeHtml(selected.description)}</div>` : ""}
+      <div class="team-add"><div><h3>Adicionar funcionário</h3><p>Digite o nome cadastrado para localizar e adicionar. O cadastro original será preservado.</p></div><div class="team-search"><input id="teamEmployeeSearch" list="team-employee-options" placeholder="Digite o nome do funcionário"><datalist id="team-employee-options">${available.map(employee=>`<option value="${escapeHtml(employee.nome)}">${escapeHtml(employee.cadastro)} · ${escapeHtml(employee.cargo)}</option>`).join("")}</datalist><button class="primary-button" data-team-add="${selected.id}">Adicionar</button></div></div>
+      <div class="team-members"><div class="panel-header"><div><h3>Integrantes</h3><p>${members.length} funcionários nesta lista</p></div></div>${members.length ? `<div class="table-wrap"><table><thead><tr><th>Cadastro</th><th>Funcionário</th><th>Cargo</th><th>Local atual</th><th>Situação</th><th></th></tr></thead><tbody>${members.map(employee=>`<tr data-open="funcionarios|${employee.id}"><td>${escapeHtml(employee.cadastro)}</td><td>${escapeHtml(employee.nome)}</td><td>${escapeHtml(employee.cargo)}</td><td>${escapeHtml(employee.local)}</td><td>${badge(employee.situacao)}</td><td><button class="row-action remove-member" data-team-remove="${selected.id}|${employee.id}" title="Remover somente desta lista">×</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty-state"><strong>Equipe sem integrantes</strong>Digite o nome de um funcionário acima para começar.</div>`}</div>`;
+  }
+  return `<div class="team-overview"><div class="team-overview-head"><div><span class="eyebrow">Listas independentes</span><h2>Equipes personalizadas</h2><p>Crie escalas e grupos sem alterar ou apagar os cadastros da base.</p></div><button class="primary-button" data-team-new>＋ Nova equipe</button></div>${teams.length ? `<div class="team-grid">${teams.map(team=>{const members=(team.members||[]).map(id=>employeeById.get(id)).filter(Boolean);return `<article class="team-card"><button class="team-card-main" data-team-open="${team.id}"><span class="team-avatar">${escapeHtml(team.name.slice(0,2).toUpperCase())}</span><div><strong>${escapeHtml(team.name)}</strong><small>${escapeHtml(team.location || "Sem local de referência")}</small></div><span class="team-size"><strong>${members.length}</strong><small>pessoas</small></span></button><footer><span>${team.leader ? `Responsável: ${escapeHtml(team.leader)}` : "Sem responsável"}</span><div><button class="row-action" data-team-edit="${team.id}" title="Editar equipe">✎</button><button class="row-action" data-team-delete="${team.id}" title="Apagar lista">×</button></div></footer></article>`}).join("")}</div>` : `<div class="empty-state team-empty"><strong>Nenhuma equipe personalizada</strong>Crie uma lista e adicione funcionários usando os nomes já cadastrados.<br><button class="primary-button" data-team-new>＋ Criar primeira equipe</button></div>`}</div>`;
+}
+
 function renderEmployees() {
   const source = state.data.modules.funcionarios || [];
   const locations = [...new Set(source.map(row => row.local).filter(Boolean))].sort((a,b) => a.localeCompare(b,"pt-BR"));
@@ -363,8 +379,8 @@ function renderEmployees() {
   return `${pageHeading("Distribuição de funcionários", "Organize a equipe por local de trabalho, consulte a base de ativos e cadastre novos colaboradores.")}
     <div class="metrics employee-metrics"><article class="metric"><span class="label">Funcionários ativos</span><strong>${source.filter(row=>slug(row.situacao)==="ativo").length}</strong><small>${source.length} registros na base</small></article><article class="metric"><span class="label">Locais de trabalho</span><strong>${locations.length}</strong><small>equipes distribuídas por operação</small></article><article class="metric"><span class="label">Áreas</span><strong>${areas.length}</strong><small>${areas.map(escapeHtml).join(" e ")}</small></article><article class="metric"><span class="label">Admissões em 2026</span><strong>${recent}</strong><small>colaboradores admitidos no ano</small></article></div>
     <section class="panel employee-panel">
-      <div class="toolbar employee-toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar nome, cadastro ou cargo"></label><label class="field-inline"><span>Local</span><select data-location-filter><option>Todos</option>${locations.map(local=>`<option ${state.employeeLocation===local?"selected":""}>${escapeHtml(local)}</option>`).join("")}</select></label><div class="spacer"></div><div class="view-toggle"><button class="${state.employeeView==="locations"?"active":""}" data-employee-view="locations" title="Locais">▦</button><button class="${state.employeeView==="list"?"active":""}" data-employee-view="list" title="Lista">▤</button></div><span class="badge">${rows.length} funcionários</span></div>
-      ${state.employeeView === "locations" && state.employeeLocation === "Todos" ? `<div class="location-grid">${locationStats.map((item,index)=>`<button class="location-card" data-employee-location="${escapeHtml(item.local)}"><span class="location-index">${String(index+1).padStart(2,"0")}</span><div><strong>${escapeHtml(item.local)}</strong><small>${escapeHtml(item.area)}</small></div><span class="location-count"><strong>${item.count}</strong><small>pessoas</small></span><div class="location-bar"><i style="width:${item.count/locationStats[0].count*100}%"></i></div><footer>${item.roles} cargos diferentes <b>Ver equipe →</b></footer></button>`).join("")}</div>` : `<div class="employee-context">${state.employeeLocation !== "Todos" ? `<button class="secondary-button" data-clear-location>← Todos os locais</button><div><span class="eyebrow">Equipe selecionada</span><h3>${escapeHtml(state.employeeLocation)}</h3></div>` : `<div><span class="eyebrow">Base completa</span><h3>Todos os funcionários</h3></div>`}</div><div class="table-wrap"><table><thead><tr>${columns.map(column=>`<th>${LABELS[column]}</th>`).join("")}<th></th></tr></thead><tbody>${visible.map(row=>`<tr data-open="funcionarios|${row.id}">${columns.map(column=>`<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "situacao" ? badge(row[column]) : formatValue(row[column],column)}</span></td>`).join("")}<td><button class="row-action" data-edit="funcionarios|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("")}</tbody></table></div><div class="table-footer"><span>Exibindo ${rows.length?(state.page-1)*pageSize+1:0}–${Math.min(state.page*pageSize,rows.length)} de ${rows.length}</span><div class="pagination"><button data-page="${state.page-1}" ${state.page<=1?"disabled":""}>‹</button><span class="badge">${state.page} / ${pages}</span><button data-page="${state.page+1}" ${state.page>=pages?"disabled":""}>›</button></div></div>`}
+      <div class="toolbar employee-toolbar">${state.employeeView !== "teams" ? `<label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar nome, cadastro ou cargo"></label><label class="field-inline"><span>Local</span><select data-location-filter><option>Todos</option>${locations.map(local=>`<option ${state.employeeLocation===local?"selected":""}>${escapeHtml(local)}</option>`).join("")}</select></label>` : `<span class="badge">Listas personalizadas não alteram a base de funcionários</span>`}<div class="spacer"></div><div class="view-toggle employee-views"><button class="${state.employeeView==="locations"?"active":""}" data-employee-view="locations" title="Locais">▦</button><button class="${state.employeeView==="list"?"active":""}" data-employee-view="list" title="Lista completa">▤</button><button class="${state.employeeView==="teams"?"active":""}" data-employee-view="teams" title="Equipes personalizadas">♙</button></div>${state.employeeView !== "teams" ? `<span class="badge">${rows.length} funcionários</span>` : ""}</div>
+      ${state.employeeView === "teams" ? renderTeams(source) : state.employeeView === "locations" && state.employeeLocation === "Todos" ? `<div class="location-grid">${locationStats.map((item,index)=>`<button class="location-card" data-employee-location="${escapeHtml(item.local)}"><span class="location-index">${String(index+1).padStart(2,"0")}</span><div><strong>${escapeHtml(item.local)}</strong><small>${escapeHtml(item.area)}</small></div><span class="location-count"><strong>${item.count}</strong><small>pessoas</small></span><div class="location-bar"><i style="width:${item.count/locationStats[0].count*100}%"></i></div><footer>${item.roles} cargos diferentes <b>Ver equipe →</b></footer></button>`).join("")}</div>` : `<div class="employee-context">${state.employeeLocation !== "Todos" ? `<button class="secondary-button" data-clear-location>← Todos os locais</button><div><span class="eyebrow">Equipe selecionada</span><h3>${escapeHtml(state.employeeLocation)}</h3></div>` : `<div><span class="eyebrow">Base completa</span><h3>Todos os funcionários</h3></div>`}</div><div class="table-wrap"><table><thead><tr>${columns.map(column=>`<th>${LABELS[column]}</th>`).join("")}<th></th></tr></thead><tbody>${visible.map(row=>`<tr data-open="funcionarios|${row.id}">${columns.map(column=>`<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "situacao" ? badge(row[column]) : formatValue(row[column],column)}</span></td>`).join("")}<td><button class="row-action" data-edit="funcionarios|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("")}</tbody></table></div><div class="table-footer"><span>Exibindo ${rows.length?(state.page-1)*pageSize+1:0}–${Math.min(state.page*pageSize,rows.length)} de ${rows.length}</span><div class="pagination"><button data-page="${state.page-1}" ${state.page<=1?"disabled":""}>‹</button><span class="badge">${state.page} / ${pages}</span><button data-page="${state.page+1}" ${state.page>=pages?"disabled":""}>›</button></div></div>`}
     </section>`;
 }
 
@@ -391,7 +407,7 @@ function render() {
 function bindViewEvents() {
   $$('[data-route]', $("#app")).forEach(button => button.addEventListener("click", () => navigate(button.dataset.route)));
   $$('[data-open]').forEach(element => element.addEventListener("click", event => {
-    if (event.target.closest("[data-edit]")) return;
+    if (event.target.closest("[data-edit], [data-team-remove]")) return;
     const [module, id] = element.dataset.open.split("|"); openDetails(module, id);
   }));
   $$('[data-edit]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [module, id] = button.dataset.edit.split("|"); openForm(module, id); }));
@@ -407,10 +423,71 @@ function bindViewEvents() {
   $$('[data-employee-location]').forEach(button => button.addEventListener("click", () => { state.employeeLocation = button.dataset.employeeLocation; state.employeeView = "list"; state.page = 1; render(); }));
   $("[data-location-filter]")?.addEventListener("change", event => { state.employeeLocation = event.target.value; state.employeeView = event.target.value === "Todos" ? state.employeeView : "list"; state.page = 1; render(); });
   $("[data-clear-location]")?.addEventListener("click", () => { state.employeeLocation = "Todos"; state.employeeView = "locations"; state.page = 1; render(); });
+  $$('[data-team-new]').forEach(button => button.addEventListener("click", () => openTeamDialog()));
+  $$('[data-team-open]').forEach(button => button.addEventListener("click", () => { state.selectedTeam = button.dataset.teamOpen; render(); }));
+  $("[data-team-back]")?.addEventListener("click", () => { state.selectedTeam = null; render(); });
+  $$('[data-team-edit]').forEach(button => button.addEventListener("click", () => openTeamDialog(button.dataset.teamEdit)));
+  $$('[data-team-delete]').forEach(button => button.addEventListener("click", () => deleteTeam(button.dataset.teamDelete)));
+  $("[data-team-add]")?.addEventListener("click", event => addTeamMember(event.currentTarget.dataset.teamAdd));
+  $$('[data-team-remove]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [teamId,employeeId]=button.dataset.teamRemove.split("|"); removeTeamMember(teamId,employeeId); }));
   $$('[data-action="print"]').forEach(button => button.addEventListener("click", () => print()));
   $$('[data-action="export-csv"]').forEach(button => button.addEventListener("click", () => exportCsv(state.route)));
   $$('[data-raw-sheet]').forEach(button => button.addEventListener("click", () => { state.rawSheet = { index: Number(button.dataset.rawSheet) }; render(); }));
   $("[data-back-raw]")?.addEventListener("click", () => { state.rawSheet = null; render(); });
+}
+
+function openTeamDialog(teamId = null) {
+  const team = stored(TEAMS_KEY, []).find(item => item.id === teamId) || {};
+  state.selectedTeam = teamId || state.selectedTeam;
+  $("#teamDialogTitle").textContent = teamId ? "Editar equipe" : "Nova equipe";
+  $("#teamName").value = team.name || "";
+  $("#teamLocation").value = team.location || "";
+  $("#teamLeader").value = team.leader || "";
+  $("#teamDescription").value = team.description || "";
+  $("#teamForm").dataset.teamId = teamId || "";
+  $("#teamDialog").showModal();
+}
+
+function saveTeam(event) {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+  const id = event.currentTarget.dataset.teamId;
+  const teams = stored(TEAMS_KEY, []);
+  if (id) {
+    const team = teams.find(item => item.id === id);
+    if (team) Object.assign(team, values, { updatedAt: new Date().toISOString() });
+    audit("Edição", "funcionarios", { id, frota: values.name }, "Equipe personalizada atualizada");
+  } else {
+    const team = { id: `team-${Date.now()}`, ...values, members: [], createdAt: new Date().toISOString() };
+    teams.push(team); state.selectedTeam = team.id;
+    audit("Inclusão", "funcionarios", { id: team.id, frota: team.name }, "Nova equipe personalizada");
+  }
+  save(TEAMS_KEY, teams); $("#teamDialog").close(); toast("Equipe salva com sucesso."); render();
+}
+
+function deleteTeam(teamId) {
+  const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
+  if (!confirm(`Apagar apenas a lista “${team.name}”? Nenhum cadastro de funcionário será excluído.`)) return;
+  save(TEAMS_KEY, teams.filter(item => item.id !== teamId)); state.selectedTeam = null;
+  audit("Exclusão", "funcionarios", { id: teamId, frota: team.name }, "Lista apagada; cadastros preservados"); toast("Lista apagada. Os funcionários continuam cadastrados."); render();
+}
+
+function addTeamMember(teamId) {
+  const input = $("#teamEmployeeSearch"); const name = input?.value.trim(); if (!name) return toast("Digite o nome do funcionário.");
+  const employees = state.data.modules.funcionarios || [];
+  const matches = employees.filter(employee => slug(employee.nome) === slug(name));
+  if (!matches.length) return toast("Funcionário não encontrado. Selecione um nome da base.");
+  const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
+  const employee = matches[0]; team.members ||= [];
+  if (team.members.includes(employee.id)) return toast("Este funcionário já está nesta equipe.");
+  team.members.push(employee.id); team.updatedAt = new Date().toISOString(); save(TEAMS_KEY, teams);
+  audit("Edição", "funcionarios", employee, `Adicionado à equipe ${team.name}`); toast(`${employee.nome} adicionado à equipe.`); render();
+}
+
+function removeTeamMember(teamId, employeeId) {
+  const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
+  const employee = findRecord("funcionarios", employeeId); team.members = (team.members || []).filter(id => id !== employeeId); save(TEAMS_KEY, teams);
+  audit("Edição", "funcionarios", employee || {id:employeeId}, `Removido da equipe ${team.name}; cadastro preservado`); toast("Removido apenas desta lista. O cadastro foi preservado."); render();
 }
 
 function findRecord(module, id) { return (state.data.modules[module] || []).find(row => row.id === id); }
@@ -500,6 +577,7 @@ function bindGlobalEvents() {
     document.documentElement.dataset.theme = next; localStorage.setItem("entressafra-theme", next); toast(`Tema ${next === "dark" ? "escuro" : "claro"} ativado.`);
   });
   $("#recordForm").addEventListener("submit", persistForm);
+  $("#teamForm").addEventListener("submit", saveTeam);
   $("#deleteButton").addEventListener("click", deleteSelected);
   $$('[data-close-detail]').forEach(button => button.addEventListener("click", () => $("#detailDialog").close()));
   $("#editFromDetail").addEventListener("click", () => { const selected = { ...state.selected }; $("#detailDialog").close(); openForm(selected.module, selected.id); });
