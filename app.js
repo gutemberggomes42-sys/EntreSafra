@@ -815,6 +815,14 @@ function bindGlobalEvents() {
 async function init() {
   try {
     document.documentElement.dataset.theme = localStorage.getItem("entressafra-theme") || "light";
+    const authenticated = await Promise.race([window.firebaseAuthReady || Promise.resolve(false), new Promise(resolve => setTimeout(() => resolve(false), 7000))]);
+    if (!authenticated) {
+      window.__entressafraAuthLocked = true;
+      $("#app").innerHTML = `<div class="auth-required"><div class="auth-required-icon">🔒</div><span class="eyebrow">Acesso restrito</span><h1>Entre para acessar o sistema</h1><p>Os dados e as alterações ficam disponíveis somente para usuários autenticados.</p><button class="primary-button" data-open-auth>Entrar no sistema</button></div>`;
+      $("#authDialog")?.showModal();
+      $("#app")?.addEventListener("click", event => { if (event.target.closest("[data-open-auth]")) $("#authDialog")?.showModal(); });
+      return;
+    }
     if (window.__ENTRESSAFRA_DATA__) {
       state.data = window.__ENTRESSAFRA_DATA__;
     } else {

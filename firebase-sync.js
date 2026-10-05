@@ -27,6 +27,7 @@ let applyingRemote = false;
 let workspaceRef = null;
 let auth = null;
 let unsubscribeSnapshot = null;
+let authStateResolved = false;
 
 function setStatus(text, mode = "online") {
   const label = document.querySelector("#cloudStatusText");
@@ -150,7 +151,8 @@ async function start() {
   });
   onAuthStateChanged(auth, user => {
     window.FirebaseSync.user = user || null; setUser(user);
-    if (user) { setStatus("Autenticado · conectando...", "syncing"); startFirestore(app,user); }
+    if (!authStateResolved) { authStateResolved = true; window.__resolveFirebaseAuth?.(!!user); }
+    if (user) { setStatus("Autenticado · conectando...", "syncing"); startFirestore(app,user); if (window.__entressafraAuthLocked) location.reload(); }
     else { unsubscribeSnapshot?.(); unsubscribeSnapshot=null; workspaceRef=null; window.FirebaseSync.connected=false; setStatus("Login necessário para sincronizar", "offline"); window.__resolveFirebaseSync?.(false); }
   });
 }

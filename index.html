@@ -129,7 +129,7 @@
     </form>
   </dialog>
 
-  <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve);</script>
+  <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve); window.firebaseAuthReady = new Promise(resolve => window.__resolveFirebaseAuth = resolve);</script>
   <script type="module" src="firebase-sync.js"></script>
   <script src="data.js?v=20261005-2" defer></script>
   <script src="app.js?v=20261005-2" defer></script>
