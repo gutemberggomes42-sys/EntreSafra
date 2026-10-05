@@ -45,7 +45,7 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -390,7 +390,8 @@ function renderTruckDocuments() {
 }
 
 function renderAxiagroInstallations(stock) {
-  const installations = stored(AXIAGRO_INSTALLATIONS_KEY, []);
+  const allInstallations = stored(AXIAGRO_INSTALLATIONS_KEY, []);
+  const installations = allInstallations;
   const selected = installations.find(item=>item.id===state.selectedAxiagroInstallation);
   const stockById = new Map(stock.map(item=>[item.id,item]));
   if(selected){
@@ -527,6 +528,11 @@ function render() {
 }
 
 function bindViewEvents() {
+  if (state.route === "axiagro" && state.axiagroTab === "instalacoes" && !$(".installation-front-filter")) {
+    const all = stored(AXIAGRO_INSTALLATIONS_KEY, []); const fronts = [...new Set(all.map(item => String(item.front || "Não definida")))].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
+    const grid = $(".installation-grid"); const filter = document.createElement("div"); filter.className = "installation-front-filter"; filter.innerHTML = `<span>Separar por frente</span><div>${["Todas", ...fronts].map(front=>`<button class="filter-chip ${state.axiagroFront===front?'active':''}" data-axiagro-front="${escapeHtml(front)}">${escapeHtml(front)}</button>`).join("")}</div>`; (grid?.parentElement || $(".installations-overview"))?.insertBefore(filter, grid || null);
+    $$('[data-installation-open]').forEach(card => { const item = all.find(entry => entry.id === card.dataset.installationOpen); card.hidden = state.axiagroFront !== "Todas" && String(item?.front || "Não definida") !== state.axiagroFront; });
+  }
   $$('[data-route]', $("#app")).forEach(button => button.addEventListener("click", () => navigate(button.dataset.route)));
   $$('[data-open]').forEach(element => element.addEventListener("click", event => {
     if (event.target.closest("[data-edit], [data-team-remove]")) return;
@@ -545,6 +551,7 @@ function bindViewEvents() {
   $("[data-page-size]")?.addEventListener("change", event => { state.pageSize=Number(event.target.value); state.page=1; render(); });
   $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.axiagroFilter="Todos"; state.query = ""; render(); }));
   $$('[data-axiagro-filter]').forEach(button => button.addEventListener("click", () => { state.axiagroFilter=button.dataset.axiagroFilter; render(); }));
+  $$('[data-axiagro-front]').forEach(button => button.addEventListener("click", () => { state.axiagroFront=button.dataset.axiagroFront; render(); }));
   $("[data-axiagro-new]")?.addEventListener("click", event => openForm(event.currentTarget.dataset.axiagroNew));
   $("[data-installation-new]")?.addEventListener("click", () => openInstallationDialog());
   $$('[data-installation-open]').forEach(button=>button.addEventListener("click",()=>{state.selectedAxiagroInstallation=button.dataset.installationOpen;render();}));
