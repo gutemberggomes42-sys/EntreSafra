@@ -2,6 +2,8 @@ const MODULES = {
   dashboard: { label: "Visão geral", icon: "◫", group: "Gestão" },
   analytics: { label: "Análises e desempenho", icon: "⌁", group: "Gestão", title: "Análises e desempenho", description: "Indicadores comparativos, eficiência por categoria e visão executiva da entressafra." },
   deadlines: { label: "Prazos e alertas", icon: "◷", group: "Gestão", title: "Central de prazos e alertas", description: "Reformas atrasadas, entregas próximas e documentos que exigem atenção." },
+  quality: { label: "Qualidade dos dados", icon: "✓", group: "Gestão", title: "Qualidade e integridade dos dados", description: "Diagnóstico automático de campos vazios, duplicidades e registros que precisam de revisão." },
+  search: { label: "Pesquisa global", title: "Pesquisa em todo o sistema", description: "Resultados encontrados em todos os módulos operacionais." },
   plantio: { label: "Equipamentos de plantio", icon: "⌁", group: "Operação", title: "Equipamentos de plantio", description: "Situação, pendências e previsão de entrega dos equipamentos das frentes 4001 e 4002.", key: "frota", columns: ["frota", "equipamento", "modelo", "frente", "status", "pendencias", "previsaoEntrega"] },
   caminhoesReforma: { label: "Reforma de caminhões", icon: "▰", group: "Reformas", title: "Reforma de caminhões", description: "Acompanhamento de limpeza, localização, pendências e execução da reforma.", key: "frota", columns: ["frota", "placa", "funcao", "localizacao", "status", "pendencias", "inicio", "fim"] },
   carretasReforma: { label: "Reforma de carretas", icon: "▱", group: "Reformas", title: "Reforma de implementos rodoviários", description: "Controle da reforma, limpeza, lubrificação, pneus e programação dos implementos.", key: "frota", columns: ["frota", "placa", "grupo", "funcao", "localizacao", "status", "pendencias", "inicio", "fim"] },
@@ -43,7 +45,7 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -86,7 +88,7 @@ function nav() {
 
 function navigate(route) {
   state.route = MODULES[route] ? route : "dashboard";
-  state.page = 1; state.status = "Todos"; state.rawSheet = null;
+  state.page = 1; state.status = "Todos"; state.rawSheet = null; state.sortBy = ""; state.sortDir = "asc";
   location.hash = state.route;
   nav(); render();
   $("#sidebar").classList.remove("open");
@@ -268,11 +270,38 @@ function renderActivity() {
   return `${pageHeading(MODULES.activity.title, MODULES.activity.description, false)}<section class="panel"><div class="panel-header"><div><h3>Atividade local</h3><p>As ações ficam registradas somente neste navegador</p></div><span class="badge">${log.length} eventos</span></div><div class="activity-list">${log.length ? log.map(item => `<article class="activity-item"><span class="activity-icon ${slug(item.action)}">${item.action === "Exclusão" ? "−" : item.action === "Inclusão" ? "+" : "↻"}</span><div><strong>${escapeHtml(item.action)} · ${escapeHtml(item.record)}</strong><p>${escapeHtml(MODULES[item.module]?.label || item.module)}${item.details ? ` · ${escapeHtml(item.details)}` : ""}</p></div><time>${new Date(item.at).toLocaleString("pt-BR")}</time></article>`).join("") : `<div class="empty-state"><strong>Nenhuma alteração registrada</strong>As próximas inclusões, edições e exclusões aparecerão aqui.</div>`}</div></section>`;
 }
 
+function moduleHealth(module) {
+  const config = MODULES[module]; const rows = state.data.modules[module] || []; const columns = config?.columns || [];
+  const cells = rows.length * columns.length;
+  const missing = rows.reduce((sum,row) => sum + columns.filter(column => isBlank(row[column])).length, 0);
+  const keys = rows.map(row => slug(row[config?.key])).filter(Boolean);
+  const duplicates = keys.length - new Set(keys).size;
+  const completeness = cells ? Math.round((cells-missing)/cells*100) : 100;
+  return { module, rows:rows.length, missing, duplicates, completeness };
+}
+
+function renderQuality() {
+  const modules = Object.keys(MODULES).filter(key => MODULES[key].columns && state.data.modules[key]);
+  const health = modules.map(moduleHealth).sort((a,b)=>a.completeness-b.completeness || b.missing-a.missing);
+  const totalRows = health.reduce((sum,item)=>sum+item.rows,0); const missing = health.reduce((sum,item)=>sum+item.missing,0); const duplicates = health.reduce((sum,item)=>sum+item.duplicates,0);
+  const average = health.length ? Math.round(health.reduce((sum,item)=>sum+item.completeness,0)/health.length) : 100;
+  return `${pageHeading(MODULES.quality.title,MODULES.quality.description,false)}<div class="metrics"><article class="metric"><span class="label">Integridade média</span><strong>${average}%</strong><small>considerando os campos principais</small></article><article class="metric"><span class="label">Registros analisados</span><strong>${totalRows}</strong><small>em ${health.length} módulos</small></article><article class="metric warning"><span class="label">Campos não preenchidos</span><strong>${missing}</strong><small>oportunidades de completar a base</small></article><article class="metric ${duplicates?'danger':''}"><span class="label">Chaves duplicadas</span><strong>${duplicates}</strong><small>frotas ou cadastros repetidos</small></article></div><section class="panel"><div class="panel-header"><div><h3>Diagnóstico por módulo</h3><p>Abra um módulo para revisar e corrigir seus registros</p></div></div><div class="quality-list">${health.map(item=>`<button class="quality-row" data-route="${item.module}"><div><strong>${escapeHtml(MODULES[item.module].label)}</strong><small>${item.rows} registros · ${item.missing} campos vazios${item.duplicates?` · ${item.duplicates} duplicados`:''}</small></div><div class="quality-score"><span><i style="width:${item.completeness}%"></i></span><strong>${item.completeness}%</strong></div><b>Revisar →</b></button>`).join('')}</div></section>`;
+}
+
+function renderGlobalSearch() {
+  const query = slug(state.query);
+  const modules = Object.keys(MODULES).filter(key => MODULES[key].columns && state.data.modules[key]);
+  const groups = modules.map(module=>({module,rows:(state.data.modules[module]||[]).filter(row=>query&&slug(Object.values(row).join(' ')).includes(query)).slice(0,12)})).filter(group=>group.rows.length);
+  const total = groups.reduce((sum,group)=>sum+group.rows.length,0);
+  return `${pageHeading('Pesquisa global',state.query?`Resultados para “${state.query}” em toda a operação.`:'Digite no campo superior para pesquisar todos os módulos.',false)}${query?`<div class="search-summary"><strong>${total}</strong><span>resultados exibidos em ${groups.length} módulos</span></div>${groups.length?`<div class="global-results">${groups.map(group=>`<section class="panel"><div class="panel-header"><div><h3>${escapeHtml(MODULES[group.module].label)}</h3><p>${group.rows.length} resultados encontrados</p></div><button class="secondary-button" data-route="${group.module}">Abrir módulo</button></div><div class="result-list">${group.rows.map(row=>`<button data-open="${group.module}|${row.id}"><strong>${escapeHtml(row.frota||row.placa||row.nome||row.equipamento||row.cadastro||'Registro')}</strong><span>${escapeHtml(row.pendencias||row.descricao||row.cargo||row.localizacao||row.local||row.status||'Ver detalhes')}</span><b>›</b></button>`).join('')}</div></section>`).join('')}</div>`:`<div class="empty-state"><strong>Nenhum resultado encontrado</strong>Tente outro nome, frota, placa, cadastro ou palavra-chave.</div>`}`:`<div class="empty-state"><strong>Pesquisa integrada</strong>Encontre equipamentos, documentos, funcionários, rádios e controles AXIAGRO em uma única busca.</div>`}`;
+}
+
 function filteredRows(module) {
   let rows = state.data.modules[module] || [];
   const query = slug(state.query);
   if (query) rows = rows.filter(row => slug(Object.values(row).join(" ")).includes(query));
   if (state.status !== "Todos") rows = rows.filter(row => normalizeStatus(row) === state.status);
+  if (state.sortBy) rows = [...rows].sort((a,b) => String(a[state.sortBy] ?? "").localeCompare(String(b[state.sortBy] ?? ""), "pt-BR", { numeric:true }) * (state.sortDir === "desc" ? -1 : 1));
   return rows;
 }
 
@@ -287,6 +316,7 @@ function renderKanban(module, rows) {
 function renderModule(module) {
   const config = MODULES[module];
   const rows = filteredRows(module);
+  const health = moduleHealth(module);
   const pages = Math.max(1, Math.ceil(rows.length / state.pageSize));
   state.page = Math.min(state.page, pages);
   const start = (state.page - 1) * state.pageSize;
@@ -295,14 +325,14 @@ function renderModule(module) {
   const columns = config.columns;
   const summary = hasStatus ? ["Concluído", "Em andamento", "Pendente"].map(name => ({name, count: rows.filter(row => normalizeStatus(row) === name).length})) : [];
   return `${pageHeading(config.title, config.description)}
-    ${hasStatus ? `<div class="module-summary"><article><span>Total</span><strong>${rows.length}</strong></article>${summary.map(item => `<article><span>${item.name}</span><strong>${item.count}</strong></article>`).join("")}</div>` : ""}
+    <div class="module-summary"><article><span>Total filtrado</span><strong>${rows.length}</strong></article>${hasStatus ? summary.map(item => `<article><span>${item.name}</span><strong>${item.count}</strong></article>`).join("") : `<article><span>Integridade</span><strong>${health.completeness}%</strong></article><article><span>Campos vazios</span><strong>${health.missing}</strong></article><article><span>Duplicados</span><strong>${health.duplicates}</strong></article>`}</div>
     <section class="panel">
       <div class="toolbar">
         <label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar neste módulo"></label>
         ${hasStatus ? `<label class="field-inline"><span>Situação</span><select data-status-filter>${["Todos", "Concluído", "Em andamento", "Pendente", "Não informado"].map(value => `<option ${state.status === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>` : ""}
-        <div class="spacer"></div>${hasStatus ? `<div class="view-toggle"><button class="${state.viewMode === "table" ? "active" : ""}" data-view="table" title="Tabela">▤</button><button class="${state.viewMode === "kanban" ? "active" : ""}" data-view="kanban" title="Kanban">▦</button></div>` : ""}<span class="badge">${rows.length} registros</span>
+        <label class="field-inline compact-select"><span>Linhas</span><select data-page-size>${[10,25,50,100].map(value=>`<option ${state.pageSize===value?'selected':''}>${value}</option>`).join('')}</select></label><div class="spacer"></div>${hasStatus ? `<div class="view-toggle"><button class="${state.viewMode === "table" ? "active" : ""}" data-view="table" title="Tabela">▤</button><button class="${state.viewMode === "kanban" ? "active" : ""}" data-view="kanban" title="Kanban">▦</button></div>` : ""}<span class="badge">${health.completeness}% completo</span><span class="badge">${rows.length} registros</span>
       </div>
-      ${hasStatus && state.viewMode === "kanban" ? renderKanban(module, rows) : `<div class="table-wrap"><table><thead><tr>${columns.map(column => `<th>${LABELS[column] || column}</th>`).join("")}<th></th></tr></thead>
+      ${hasStatus && state.viewMode === "kanban" ? renderKanban(module, rows) : `<div class="table-wrap"><table><thead><tr>${columns.map(column => `<th><button class="sort-button ${state.sortBy===column?'active':''}" data-sort="${column}">${LABELS[column] || column}${state.sortBy===column?` <span>${state.sortDir==='asc'?'↑':'↓'}</span>`:''}</button></th>`).join("")}<th></th></tr></thead>
         <tbody>${visible.length ? visible.map(row => `<tr data-open="${module}|${row.id}">${columns.map(column => `<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${formatValue(row[column], column)}</span></td>`).join("")}<td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("") : `<tr><td colspan="${columns.length + 1}"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Experimente alterar os filtros ou a busca.</div></td></tr>`}</tbody>
       </table></div>
       <div class="table-footer"><span>Exibindo ${rows.length ? start + 1 : 0}–${Math.min(start + state.pageSize, rows.length)} de ${rows.length}</span><div class="pagination"><button data-page="${state.page - 1}" ${state.page <= 1 ? "disabled" : ""}>‹</button><span class="badge">${state.page} / ${pages}</span><button data-page="${state.page + 1}" ${state.page >= pages ? "disabled" : ""}>›</button></div></div>`}
@@ -411,8 +441,8 @@ function renderRaw() {
 
 function render() {
   $("#breadcrumb").textContent = MODULES[state.route].label;
-  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "axiagro", "activity", "raw"].includes(state.route));
-  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
+  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "activity", "raw"].includes(state.route));
+  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
 }
@@ -430,6 +460,8 @@ function bindViewEvents() {
   if (statusFilter) statusFilter.addEventListener("change", event => { state.status = event.target.value; state.page = 1; render(); });
   $$('[data-page]').forEach(button => button.addEventListener("click", () => { state.page = Number(button.dataset.page); render(); }));
   $$('[data-view]').forEach(button => button.addEventListener("click", () => { state.viewMode = button.dataset.view; render(); }));
+  $$('[data-sort]').forEach(button => button.addEventListener("click", () => { const column=button.dataset.sort; state.sortDir=state.sortBy===column&&state.sortDir==='asc'?'desc':'asc'; state.sortBy=column; state.page=1; render(); }));
+  $("[data-page-size]")?.addEventListener("change", event => { state.pageSize=Number(event.target.value); state.page=1; render(); });
   $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.query = ""; render(); }));
   $("[data-axiagro-new]")?.addEventListener("click", event => openForm(event.currentTarget.dataset.axiagroNew));
   $$('[data-employee-view]').forEach(button => button.addEventListener("click", () => { state.employeeView = button.dataset.employeeView; state.page = 1; render(); }));
@@ -605,7 +637,7 @@ function exportCsv(module) {
 }
 function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 function backup() {
-  const payload = { generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []) };
+  const payload = { version: 2, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), audit: stored(AUDIT_KEY, []) };
   download(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `backup-entressafra-${new Date().toISOString().slice(0, 10)}.json`); toast("Backup dos dados gerado.");
 }
 function toast(message) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), 3000); }
@@ -624,7 +656,7 @@ function bindGlobalEvents() {
   $$('[data-close-detail]').forEach(button => button.addEventListener("click", () => $("#detailDialog").close()));
   $("#editFromDetail").addEventListener("click", () => { const selected = { ...state.selected }; $("#detailDialog").close(); openForm(selected.module, selected.id); });
   $("#sidebar").addEventListener("click", event => { if (event.target.closest('[data-action="open-backup"]')) backup(); });
-  $("#globalSearch").addEventListener("input", event => { state.query = event.target.value; if (state.route === "dashboard" || state.route === "raw") state.route = "plantio"; state.page = 1; nav(); render(); });
+  $("#globalSearch").addEventListener("input", event => { state.query = event.target.value; state.route = state.query.trim() ? "search" : "dashboard"; state.page = 1; nav(); render(); });
   document.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); $("#globalSearch").focus(); } });
   window.addEventListener("hashchange", () => { const route = location.hash.slice(1); if (MODULES[route] && route !== state.route) navigate(route); });
 }
