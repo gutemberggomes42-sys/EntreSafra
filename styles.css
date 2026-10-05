@@ -26,6 +26,7 @@
 .auth-required-icon { width:64px; height:64px; display:grid; place-items:center; border-radius:20px; background:var(--green-soft); font-size:28px; }
 .auth-required h1 { margin:0; font-family:Manrope, sans-serif; font-size:clamp(24px,3vw,38px); }
 .auth-required p { max-width:440px; margin:0 0 12px; color:var(--muted); }
+.installation-status-line { display:block; margin-top:5px; color:var(--muted); font-size:11px; font-weight:700; }
 
 :root[data-theme="dark"] {
   --ink: #e8f0ed; --muted: #9cafaa; --line: #2c4540; --surface: #162a26; --canvas: #10201d;

@@ -532,6 +532,7 @@ function bindViewEvents() {
     const all = stored(AXIAGRO_INSTALLATIONS_KEY, []); const fronts = [...new Set(all.map(item => String(item.front || "Não definida")))].sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
     const grid = $(".installation-grid"); const filter = document.createElement("div"); filter.className = "installation-front-filter"; filter.innerHTML = `<span>Separar por frente</span><div>${["Todas", ...fronts].map(front=>`<button class="filter-chip ${state.axiagroFront===front?'active':''}" data-axiagro-front="${escapeHtml(front)}">${escapeHtml(front)}</button>`).join("")}</div>`; (grid?.parentElement || $(".installations-overview"))?.insertBefore(filter, grid || null);
     $$('[data-installation-open]').forEach(card => { const item = all.find(entry => entry.id === card.dataset.installationOpen); card.hidden = state.axiagroFront !== "Todas" && String(item?.front || "Não definida") !== state.axiagroFront; });
+    $$('[data-installation-open]').forEach(card => { const item = all.find(entry => entry.id === card.dataset.installationOpen); const info = card.querySelector("div"); if (item && info && !info.querySelector(".installation-status-line")) { const line = document.createElement("small"); line.className = "installation-status-line"; line.textContent = `${item.operationalStatus || "Em operação"} · ${item.location || "Local não informado"}`; info.appendChild(line); } });
   }
   $$('[data-route]', $("#app")).forEach(button => button.addEventListener("click", () => navigate(button.dataset.route)));
   $$('[data-open]').forEach(element => element.addEventListener("click", event => {
@@ -584,7 +585,7 @@ function bindViewEvents() {
 
 function openInstallationDialog(installationId=null){
   const installation=stored(AXIAGRO_INSTALLATIONS_KEY,[]).find(item=>item.id===installationId)||{};
-  $("#installationFleet").value=installation.fleet||""; $("#installationFront").value=installation.front||""; $("#installationDescription").value=installation.description||""; $("#installationLocation").value=installation.location||"";
+  $("#installationFleet").value=installation.fleet||""; $("#installationFront").value=installation.front||""; $("#installationDescription").value=installation.description||""; $("#installationLocation").value=installation.location||""; $("#installationStatus").value=installation.operationalStatus||"Em operação";
   $("#installationForm").dataset.installationId=installationId||""; $("#installationDialog").showModal();
 }
 
