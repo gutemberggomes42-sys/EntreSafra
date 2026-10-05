@@ -103,6 +103,32 @@
     </form>
   </dialog>
 
+  <dialog id="axiagroItemDialog" class="dialog axiagro-item-dialog">
+    <form method="dialog" id="axiagroItemForm">
+      <div class="dialog-header"><div><span class="eyebrow">AXIAGRO · Instalação</span><h2 id="axiagroItemDialogTitle">Instalar componente</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><div class="form-grid">
+        <div class="form-field wide"><label for="axiagroItemStock">Componente</label><select id="axiagroItemStock" name="stockId" required></select></div>
+        <div class="form-field"><label for="axiagroItemQuantity">Quantidade</label><input id="axiagroItemQuantity" name="quantity" type="number" min="1" value="1" required></div>
+        <div class="form-field"><label for="axiagroItemStatus">Situação na instalação</label><select id="axiagroItemStatus" name="status"><option>OK</option><option>Danificado</option><option>Em manutenção</option></select></div>
+        <div class="form-field wide hidden" id="axiagroMacField"><label for="axiagroItemMac">MAC do celular</label><input id="axiagroItemMac" name="mac" placeholder="Ex.: 78:37:16:ae:5a:40"></div>
+        <div class="form-field wide hidden" id="axiagroSealField"><label for="axiagroItemSeal">Número do lacre do cabo USB</label><input id="axiagroItemSeal" name="seal" placeholder="Ex.: 6355"></div>
+        <div class="form-field wide"><label for="axiagroItemNotes">Observação</label><textarea id="axiagroItemNotes" name="notes" placeholder="Informações da instalação ou do componente"></textarea></div>
+      </div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Confirmar instalação</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="axiagroReturnDialog" class="dialog axiagro-item-dialog">
+    <form method="dialog" id="axiagroReturnForm">
+      <div class="dialog-header"><div><span class="eyebrow">AXIAGRO · Devolução</span><h2>Retirar componente</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><p class="auth-intro" id="axiagroReturnDescription"></p><div class="form-grid">
+        <div class="form-field wide"><label for="axiagroReturnStatus">Situação na devolução</label><select id="axiagroReturnStatus" name="status" required><option>OK</option><option>Danificado</option></select></div>
+        <div class="form-field wide"><label for="axiagroReturnNotes">Observação</label><textarea id="axiagroReturnNotes" name="notes" placeholder="Descreva o dano ou motivo da retirada"></textarea></div>
+      </div><div class="return-guidance"><strong>OK</strong> volta para o estoque disponível. <strong>Danificado</strong> fica separado e gera indicação para fazer pedido.</div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Confirmar devolução</button></div>
+    </form>
+  </dialog>
+
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve);</script>
   <script type="module" src="firebase-sync.js"></script>
   <script src="data.js?v=20261005-2" defer></script>

@@ -17,6 +17,12 @@
   --radius: 14px;
 }
 
+.table-subline { display:block; margin-top:3px; color:var(--muted); font-weight:500; }
+.asset-identifier { display:flex; flex-direction:column; gap:2px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-weight:700; }
+.asset-identifier small { color:var(--muted); font-family:inherit; font-size:9px; letter-spacing:.08em; text-transform:uppercase; }
+.purchase-order { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
+.return-guidance { margin-top:14px; padding:12px 14px; border:1px solid #fed7aa; border-radius:10px; background:#fff7ed; color:#9a3412; font-size:12px; line-height:1.6; }
+
 :root[data-theme="dark"] {
   --ink: #e8f0ed; --muted: #9cafaa; --line: #2c4540; --surface: #162a26; --canvas: #10201d;
   --green: #0d2521; --green-2: #55aa96; --green-soft: #203d37; --amber-soft: #4a391b;
