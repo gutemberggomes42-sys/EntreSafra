@@ -43,7 +43,7 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -350,12 +350,25 @@ function renderTeams(source) {
   if (selected) {
     const members = (selected.members || []).map(id => employeeById.get(id)).filter(Boolean);
     const available = source.filter(employee => !(selected.members || []).includes(employee.id));
-    return `<div class="team-detail-head"><button class="secondary-button" data-team-back>← Todas as equipes</button><div><span class="eyebrow">Equipe personalizada</span><h2>${escapeHtml(selected.name)}</h2><p>${escapeHtml(selected.location || "Local não definido")}${selected.leader ? ` · Responsável: ${escapeHtml(selected.leader)}` : ""}</p></div><div class="heading-actions"><button class="secondary-button" data-team-edit="${selected.id}">Editar equipe</button><button class="danger-button" data-team-delete="${selected.id}">Apagar lista</button></div></div>
+    const capacity = Number(selected.capacity) || 0;
+    const occupancy = capacity ? Math.min(100, Math.round(members.length / capacity * 100)) : 0;
+    const memberTeams = new Map(); teams.forEach(team => (team.members || []).forEach(id => { const list = memberTeams.get(id) || []; list.push(team); memberTeams.set(id, list); }));
+    const conflicts = members.filter(employee => (memberTeams.get(employee.id) || []).length > 1).length;
+    const inactive = members.filter(employee => slug(employee.situacao) !== "ativo").length;
+    const memberQuery = slug(state.teamQuery);
+    const visibleMembers = members.filter(employee => !memberQuery || slug(`${employee.nome} ${employee.cadastro} ${employee.cargo} ${employee.local}`).includes(memberQuery));
+    return `<div class="team-detail-head"><button class="secondary-button" data-team-back>← Todas as equipes</button><div><span class="eyebrow">Equipe personalizada</span><h2>${escapeHtml(selected.name)}</h2><p>${escapeHtml(selected.location || "Local não definido")}${selected.leader ? ` · Responsável: ${escapeHtml(selected.leader)}` : ""}</p><div class="team-meta"><span>${badge(selected.status || "Ativa")}</span><span>${escapeHtml(selected.shift || "Não informado")}</span>${capacity ? `<span>${members.length}/${capacity} vagas</span>` : ""}</div></div><div class="heading-actions"><button class="secondary-button" data-team-export="${selected.id}">Exportar CSV</button><button class="secondary-button" data-team-duplicate="${selected.id}">Duplicar</button><button class="secondary-button" data-team-edit="${selected.id}">Editar equipe</button><button class="danger-button" data-team-delete="${selected.id}">Apagar lista</button></div></div>
+      <div class="team-kpis"><article><span>Integrantes</span><strong>${members.length}</strong><small>${capacity ? `${occupancy}% da capacidade` : "sem limite definido"}</small></article><article class="${conflicts ? "warning" : ""}"><span>Em outras equipes</span><strong>${conflicts}</strong><small>possíveis conflitos de escala</small></article><article class="${inactive ? "warning" : ""}"><span>Fora de atividade</span><strong>${inactive}</strong><small>férias, afastados ou inativos</small></article><article><span>Cargos</span><strong>${new Set(members.map(item=>item.cargo).filter(Boolean)).size}</strong><small>funções diferentes</small></article></div>
       ${selected.description ? `<div class="team-note">${escapeHtml(selected.description)}</div>` : ""}
-      <div class="team-add"><div><h3>Adicionar funcionário</h3><p>Digite o nome cadastrado para localizar e adicionar. O cadastro original será preservado.</p></div><div class="team-search"><input id="teamEmployeeSearch" list="team-employee-options" placeholder="Digite o nome do funcionário"><datalist id="team-employee-options">${available.map(employee=>`<option value="${escapeHtml(employee.nome)}">${escapeHtml(employee.cadastro)} · ${escapeHtml(employee.cargo)}</option>`).join("")}</datalist><button class="primary-button" data-team-add="${selected.id}">Adicionar</button></div></div>
-      <div class="team-members"><div class="panel-header"><div><h3>Integrantes</h3><p>${members.length} funcionários nesta lista</p></div></div>${members.length ? `<div class="table-wrap"><table><thead><tr><th>Cadastro</th><th>Funcionário</th><th>Cargo</th><th>Local atual</th><th>Situação</th><th></th></tr></thead><tbody>${members.map(employee=>`<tr data-open="funcionarios|${employee.id}"><td>${escapeHtml(employee.cadastro)}</td><td>${escapeHtml(employee.nome)}</td><td>${escapeHtml(employee.cargo)}</td><td>${escapeHtml(employee.local)}</td><td>${badge(employee.situacao)}</td><td><button class="row-action remove-member" data-team-remove="${selected.id}|${employee.id}" title="Remover somente desta lista">×</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty-state"><strong>Equipe sem integrantes</strong>Digite o nome de um funcionário acima para começar.</div>`}</div>`;
+      <div class="team-add"><div><h3>Adicionar funcionário</h3><p>Busque por nome ou cadastro. O sistema também identifica vínculos com outras equipes.</p></div><div class="team-search"><input id="teamEmployeeSearch" list="team-employee-options" placeholder="Nome ou número do cadastro"><datalist id="team-employee-options">${available.map(employee=>`<option value="${escapeHtml(employee.nome)}">${escapeHtml(employee.cadastro)} · ${escapeHtml(employee.cargo)} · ${escapeHtml(employee.local)}</option>`).join("")}</datalist><button class="primary-button" data-team-add="${selected.id}">Adicionar</button></div></div>
+      <div class="team-members"><div class="panel-header"><div><h3>Integrantes</h3><p>${visibleMembers.length} de ${members.length} funcionários</p></div><label class="field-inline team-member-filter"><span>⌕</span><input data-team-member-search type="search" value="${escapeHtml(state.teamQuery)}" placeholder="Filtrar integrantes..."></label></div>${members.length ? `<div class="table-wrap"><table><thead><tr><th>Cadastro</th><th>Funcionário</th><th>Cargo</th><th>Local atual</th><th>Situação</th><th>Escala</th><th></th></tr></thead><tbody>${visibleMembers.map(employee=>{const links=memberTeams.get(employee.id)||[];return `<tr data-open="funcionarios|${employee.id}"><td>${escapeHtml(employee.cadastro)}</td><td><strong>${escapeHtml(employee.nome)}</strong></td><td>${escapeHtml(employee.cargo)}</td><td>${escapeHtml(employee.local)}</td><td>${badge(employee.situacao)}</td><td>${links.length>1?`<span class="badge pending">${links.length} equipes</span>`:`<span class="badge done">Exclusiva</span>`}</td><td><button class="row-action remove-member" data-team-remove="${selected.id}|${employee.id}" title="Remover somente desta lista">×</button></td></tr>`}).join("")}</tbody></table></div>${!visibleMembers.length?`<div class="empty-state"><strong>Nenhum integrante encontrado</strong>Limpe o filtro para ver todos.</div>`:""}` : `<div class="empty-state"><strong>Equipe sem integrantes</strong>Digite o nome de um funcionário acima para começar.</div>`}</div>`;
   }
-  return `<div class="team-overview"><div class="team-overview-head"><div><span class="eyebrow">Listas independentes</span><h2>Equipes personalizadas</h2><p>Crie escalas e grupos sem alterar ou apagar os cadastros da base.</p></div><button class="primary-button" data-team-new>＋ Nova equipe</button></div>${teams.length ? `<div class="team-grid">${teams.map(team=>{const members=(team.members||[]).map(id=>employeeById.get(id)).filter(Boolean);return `<article class="team-card"><button class="team-card-main" data-team-open="${team.id}"><span class="team-avatar">${escapeHtml(team.name.slice(0,2).toUpperCase())}</span><div><strong>${escapeHtml(team.name)}</strong><small>${escapeHtml(team.location || "Sem local de referência")}</small></div><span class="team-size"><strong>${members.length}</strong><small>pessoas</small></span></button><footer><span>${team.leader ? `Responsável: ${escapeHtml(team.leader)}` : "Sem responsável"}</span><div><button class="row-action" data-team-edit="${team.id}" title="Editar equipe">✎</button><button class="row-action" data-team-delete="${team.id}" title="Apagar lista">×</button></div></footer></article>`}).join("")}</div>` : `<div class="empty-state team-empty"><strong>Nenhuma equipe personalizada</strong>Crie uma lista e adicione funcionários usando os nomes já cadastrados.<br><button class="primary-button" data-team-new>＋ Criar primeira equipe</button></div>`}</div>`;
+  const allAssignments = teams.flatMap(team => team.members || []);
+  const assigned = new Set(allAssignments).size;
+  const duplicates = allAssignments.length - assigned;
+  const query = slug(state.teamQuery);
+  const filtered = teams.filter(team => (!query || slug(`${team.name} ${team.location} ${team.leader}`).includes(query)) && (state.teamStatus === "Todas" || (team.status || "Ativa") === state.teamStatus));
+  return `<div class="team-overview"><div class="team-overview-head"><div><span class="eyebrow">Central de equipes</span><h2>Equipes personalizadas</h2><p>Planeje grupos, acompanhe capacidade e identifique conflitos sem alterar a base.</p></div><button class="primary-button" data-team-new>＋ Nova equipe</button></div>${teams.length ? `<div class="team-summary"><article><span>Equipes</span><strong>${teams.length}</strong></article><article><span>Pessoas escaladas</span><strong>${assigned}</strong></article><article><span>Disponíveis</span><strong>${Math.max(0,source.length-assigned)}</strong></article><article class="${duplicates?"warning":""}"><span>Dupla alocação</span><strong>${duplicates}</strong></article></div><div class="team-toolbar"><label class="field-inline"><span>⌕</span><input data-team-search type="search" value="${escapeHtml(state.teamQuery)}" placeholder="Buscar equipe, local ou responsável"></label><label class="field-inline"><span>Situação</span><select data-team-status><option>Todas</option>${["Ativa","Planejada","Suspensa","Encerrada"].map(value=>`<option ${state.teamStatus===value?"selected":""}>${value}</option>`).join("")}</select></label><span class="badge">${filtered.length} resultados</span></div><div class="team-grid">${filtered.map(team=>{const members=(team.members||[]).map(id=>employeeById.get(id)).filter(Boolean);const capacity=Number(team.capacity)||0;return `<article class="team-card"><button class="team-card-main" data-team-open="${team.id}"><span class="team-avatar">${escapeHtml(team.name.slice(0,2).toUpperCase())}</span><div><strong>${escapeHtml(team.name)}</strong><small>${escapeHtml(team.location || "Sem local de referência")}</small><div class="team-meta"><span>${badge(team.status||"Ativa")}</span><span>${escapeHtml(team.shift||"Não informado")}</span></div></div><span class="team-size"><strong>${members.length}${capacity?`/${capacity}`:""}</strong><small>pessoas</small></span></button><footer><span>${team.leader ? `Responsável: ${escapeHtml(team.leader)}` : "Sem responsável"}</span><div><button class="row-action" data-team-duplicate="${team.id}" title="Duplicar equipe">⧉</button><button class="row-action" data-team-edit="${team.id}" title="Editar equipe">✎</button><button class="row-action" data-team-delete="${team.id}" title="Apagar lista">×</button></div></footer></article>`}).join("")}</div>${!filtered.length?`<div class="empty-state"><strong>Nenhuma equipe encontrada</strong>Ajuste a busca ou o filtro de situação.</div>`:""}` : `<div class="empty-state team-empty"><strong>Nenhuma equipe personalizada</strong>Crie uma lista e adicione funcionários usando os nomes já cadastrados.<br><button class="primary-button" data-team-new>＋ Criar primeira equipe</button></div>`}</div>`;
 }
 
 function renderEmployees() {
@@ -424,11 +437,17 @@ function bindViewEvents() {
   $("[data-location-filter]")?.addEventListener("change", event => { state.employeeLocation = event.target.value; state.employeeView = event.target.value === "Todos" ? state.employeeView : "list"; state.page = 1; render(); });
   $("[data-clear-location]")?.addEventListener("click", () => { state.employeeLocation = "Todos"; state.employeeView = "locations"; state.page = 1; render(); });
   $$('[data-team-new]').forEach(button => button.addEventListener("click", () => openTeamDialog()));
-  $$('[data-team-open]').forEach(button => button.addEventListener("click", () => { state.selectedTeam = button.dataset.teamOpen; render(); }));
-  $("[data-team-back]")?.addEventListener("click", () => { state.selectedTeam = null; render(); });
+  $$('[data-team-open]').forEach(button => button.addEventListener("click", () => { state.selectedTeam = button.dataset.teamOpen; state.teamQuery = ""; render(); }));
+  $("[data-team-back]")?.addEventListener("click", () => { state.selectedTeam = null; state.teamQuery = ""; render(); });
   $$('[data-team-edit]').forEach(button => button.addEventListener("click", () => openTeamDialog(button.dataset.teamEdit)));
   $$('[data-team-delete]').forEach(button => button.addEventListener("click", () => deleteTeam(button.dataset.teamDelete)));
+  $$('[data-team-duplicate]').forEach(button => button.addEventListener("click", () => duplicateTeam(button.dataset.teamDuplicate)));
+  $$('[data-team-export]').forEach(button => button.addEventListener("click", () => exportTeam(button.dataset.teamExport)));
   $("[data-team-add]")?.addEventListener("click", event => addTeamMember(event.currentTarget.dataset.teamAdd));
+  $("#teamEmployeeSearch")?.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addTeamMember($("[data-team-add]")?.dataset.teamAdd); } });
+  $("[data-team-search]")?.addEventListener("input", event => { state.teamQuery = event.target.value; render(); requestAnimationFrame(() => { const input=$("[data-team-search]"); input?.focus(); input?.setSelectionRange(input.value.length,input.value.length); }); });
+  $("[data-team-member-search]")?.addEventListener("input", event => { state.teamQuery = event.target.value; render(); requestAnimationFrame(() => { const input=$("[data-team-member-search]"); input?.focus(); input?.setSelectionRange(input.value.length,input.value.length); }); });
+  $("[data-team-status]")?.addEventListener("change", event => { state.teamStatus = event.target.value; render(); });
   $$('[data-team-remove]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [teamId,employeeId]=button.dataset.teamRemove.split("|"); removeTeamMember(teamId,employeeId); }));
   $$('[data-action="print"]').forEach(button => button.addEventListener("click", () => print()));
   $$('[data-action="export-csv"]').forEach(button => button.addEventListener("click", () => exportCsv(state.route)));
@@ -443,6 +462,9 @@ function openTeamDialog(teamId = null) {
   $("#teamName").value = team.name || "";
   $("#teamLocation").value = team.location || "";
   $("#teamLeader").value = team.leader || "";
+  $("#teamShift").value = team.shift || "Não informado";
+  $("#teamStatus").value = team.status || "Ativa";
+  $("#teamCapacity").value = team.capacity || "";
   $("#teamDescription").value = team.description || "";
   $("#teamForm").dataset.teamId = teamId || "";
   $("#teamDialog").showModal();
@@ -473,15 +495,35 @@ function deleteTeam(teamId) {
 }
 
 function addTeamMember(teamId) {
-  const input = $("#teamEmployeeSearch"); const name = input?.value.trim(); if (!name) return toast("Digite o nome do funcionário.");
+  const input = $("#teamEmployeeSearch"); const name = input?.value.trim(); if (!name) return toast("Digite o nome ou cadastro do funcionário.");
   const employees = state.data.modules.funcionarios || [];
-  const matches = employees.filter(employee => slug(employee.nome) === slug(name));
-  if (!matches.length) return toast("Funcionário não encontrado. Selecione um nome da base.");
+  const term = slug(name);
+  const exact = employees.filter(employee => slug(employee.nome) === term || slug(employee.cadastro) === term);
+  const matches = exact.length ? exact : employees.filter(employee => slug(`${employee.nome} ${employee.cadastro}`).includes(term));
+  if (!matches.length) return toast("Funcionário não encontrado na base.");
+  if (matches.length > 1) return toast(`${matches.length} funcionários encontrados. Digite mais letras ou o cadastro.`);
   const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
   const employee = matches[0]; team.members ||= [];
   if (team.members.includes(employee.id)) return toast("Este funcionário já está nesta equipe.");
+  const otherTeams = teams.filter(item => item.id !== teamId && (item.members || []).includes(employee.id));
   team.members.push(employee.id); team.updatedAt = new Date().toISOString(); save(TEAMS_KEY, teams);
-  audit("Edição", "funcionarios", employee, `Adicionado à equipe ${team.name}`); toast(`${employee.nome} adicionado à equipe.`); render();
+  audit("Edição", "funcionarios", employee, `Adicionado à equipe ${team.name}`); toast(otherTeams.length ? `${employee.nome} adicionado. Atenção: já integra ${otherTeams.length} outra equipe.` : `${employee.nome} adicionado à equipe.`); render();
+}
+
+function duplicateTeam(teamId) {
+  const teams = stored(TEAMS_KEY, []); const original = teams.find(item => item.id === teamId); if (!original) return;
+  const copy = { ...original, id: `team-${Date.now()}`, name: `${original.name} · Cópia`, members: [...(original.members || [])], status: "Planejada", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  teams.push(copy); save(TEAMS_KEY, teams); state.selectedTeam = copy.id;
+  audit("Inclusão", "funcionarios", { id: copy.id, frota: copy.name }, `Equipe duplicada de ${original.name}`); toast("Equipe duplicada como planejada."); render();
+}
+
+function exportTeam(teamId) {
+  const team = stored(TEAMS_KEY, []).find(item => item.id === teamId); if (!team) return;
+  const employees = new Map((state.data.modules.funcionarios || []).map(item => [item.id,item]));
+  const rows = (team.members || []).map(id => employees.get(id)).filter(Boolean);
+  const columns = ["cadastro","nome","cargo","local","area","situacao","admissao"];
+  const csv = [[`Equipe: ${team.name}`],[`Local: ${team.location || ""}`],[`Responsável: ${team.leader || ""}`],[`Turno: ${team.shift || ""}`],[],columns.map(key=>LABELS[key]),...rows.map(row=>columns.map(key=>row[key]||""))].map(line=>line.map(value=>`"${String(value).replace(/"/g,'""')}"`).join(";")).join("\r\n");
+  const blob = new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}); const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download=`equipe-${slug(team.name).replace(/\s+/g,"-")}.csv`; link.click(); URL.revokeObjectURL(link.href); toast("Lista da equipe exportada.");
 }
 
 function removeTeamMember(teamId, employeeId) {
