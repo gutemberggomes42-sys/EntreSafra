@@ -18,6 +18,7 @@ const KEYS = {
   additions: "entressafra-v1-new",
   deleted: "entressafra-v1-deleted",
   teams: "entressafra-v1-teams",
+  installations: "entressafra-v1-axiagro-installations",
   audit: "entressafra-v1-audit"
 };
 const CLOUD_STAMP = "entressafra-firebase-updated-at";

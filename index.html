@@ -95,6 +95,14 @@
     </form>
   </dialog>
 
+  <dialog id="installationDialog" class="dialog">
+    <form method="dialog" id="installationForm">
+      <div class="dialog-header"><div><span class="eyebrow">AXIAGRO</span><h2>Cadastrar equipamento</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><div class="form-grid"><div class="form-field"><label for="installationFleet">Frota / equipamento</label><input id="installationFleet" name="fleet" required placeholder="Ex.: 6988"></div><div class="form-field"><label for="installationFront">Frente</label><input id="installationFront" name="front" placeholder="Ex.: 4002"></div><div class="form-field wide"><label for="installationDescription">Descrição</label><input id="installationDescription" name="description" placeholder="Ex.: Colhedora, caminhão ou trator"></div><div class="form-field wide"><label for="installationLocation">Local</label><input id="installationLocation" name="location" placeholder="Local atual do equipamento"></div></div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Cadastrar equipamento</button></div>
+    </form>
+  </dialog>
+
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve);</script>
   <script type="module" src="firebase-sync.js"></script>
   <script src="data.js" defer></script>
