@@ -18,6 +18,7 @@ const MODULES = {
   axiagro: { label: "AXIAGRO", icon: "◉", group: "Controles", title: "Controle AXIAGRO", description: "Gestão dos celulares, suportes, lacres, fusíveis, endereços MAC e estoque de equipamentos AXIAGRO." },
   axiagroControle: { label: "AXIAGRO · Celulares", title: "Controle de celulares AXIAGRO", key: "frota", columns: ["frota", "frente", "statusCelular", "statusSuporte", "numeroLacre", "fusivel", "statusAparelho", "mac", "observacao"] },
   axiagroEstoque: { label: "AXIAGRO · Estoque", title: "Estoque AXIAGRO", key: "equipamento", columns: ["equipamento", "modelo", "quantidade"] },
+  frotasBusca: { label: "Busca Frota · Usina", icon: "▦", group: "Cadastros", title: "Frotas cadastradas da usina", description: "Base oficial da Busca Frota para seleção segura de equipamentos.", key: "frota", columns: ["frota", "equipamento", "modelo", "ano", "placa", "chassi", "situacao", "grupo", "departamento", "empresa"] },
   funcionarios: { label: "Distribuição de funcionários", icon: "♙", group: "Controles", title: "Distribuição de funcionários", description: "Cadastro e distribuição da equipe agrícola por local de trabalho.", key: "cadastro", columns: ["cadastro", "nome", "cargo", "local", "area", "admissao", "situacao", "observacao"] },
   curvaS: { label: "Curva S e cronograma", icon: "⌇", group: "Controles", title: "Curva S e cronograma", description: "Planejado, realizado, manutenção, previsões e datas de execução.", key: "frota", columns: ["frota", "grupo", "funcao", "planejado", "realizado", "emManutencao", "previsao", "consideracoes", "inicioPlanejado", "fimPlanejado"] },
   activity: { label: "Histórico de alterações", icon: "↻", group: "Dados", title: "Histórico de alterações", description: "Registro local das inclusões, edições e exclusões realizadas no sistema." },
@@ -521,7 +522,7 @@ function renderRaw() {
 
 function render() {
   $("#breadcrumb").textContent = MODULES[state.route].label;
-  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "activity", "raw"].includes(state.route));
+  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "frotasBusca", "activity", "raw"].includes(state.route));
   const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
@@ -750,6 +751,9 @@ function openForm(module = state.route, id = null) {
       const locations = [...new Set((state.data.modules.funcionarios || []).map(row => row.local).filter(Boolean))].sort();
       return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><input id="field-${field}" name="${field}" list="employee-location-options" value="${escapeHtml(value)}" placeholder="Selecione ou digite um novo local"><datalist id="employee-location-options">${locations.map(local=>`<option value="${escapeHtml(local)}"></option>`).join("")}</datalist></div>`;
     }
+    if (field === "frota" && state.data.modules.frotasBusca?.length) {
+      const fleets = state.data.modules.frotasBusca; return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><input id="field-${field}" name="${field}" list="fleet-options" value="${escapeHtml(value)}" required placeholder="Pesquise a frota na Busca Frota"><datalist id="fleet-options">${fleets.map(item=>`<option value="${escapeHtml(item.frota)}">${escapeHtml(`${item.equipamento} · ${item.placa||item.chassi||'sem identificação'}`)}</option>`).join("")}</datalist><small class="field-help">Frota vinculada à base Busca Frota.</small></div>`;
+    }
     if (module === "funcionarios" && field === "situacao") return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><select id="field-${field}" name="${field}">${[value,"Ativo","Férias","Afastado","Inativo"].filter((v,i,a)=>v&&a.indexOf(v)===i).map(v=>`<option ${v===value?"selected":""}>${escapeHtml(v)}</option>`).join("")}</select></div>`;
     if (field === "status") return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><select id="field-${field}" name="${field}">${[value, "FEITO", "FEITO (C/ Pend)", "EM ANDAMENTO", "PENDENTE", "AG. MANUTENÇÃO"].filter((v, i, a) => v && a.indexOf(v) === i).map(v => `<option ${v === value ? "selected" : ""}>${escapeHtml(v)}</option>`).join("")}</select></div>`;
     return `<div class="form-field ${isLong ? "wide" : ""}"><label for="field-${field}">${LABELS[field] || field}</label>${isLong ? `<textarea id="field-${field}" name="${field}">${escapeHtml(value)}</textarea>` : `<input id="field-${field}" name="${field}" type="${inputType(field, value)}" value="${escapeHtml(String(value).slice(0, 10) === String(value) || inputType(field, value) !== "date" ? value : String(value).slice(0, 10))}">`}</div>`;
@@ -838,6 +842,7 @@ async function init() {
       if (!response.ok) throw new Error("Falha ao carregar data.json");
       state.data = await response.json();
     }
+    try { const fleetResponse = await fetch("frotas_busca.json"); if (fleetResponse.ok) state.data.modules.frotasBusca = await fleetResponse.json(); } catch { state.data.modules.frotasBusca = []; }
     await Promise.race([window.firebaseSyncReady || Promise.resolve(false), new Promise(resolve => setTimeout(() => resolve(false), 5000))]);
     applyLocalChanges();
     ensureAxiagroPhoneStock();
