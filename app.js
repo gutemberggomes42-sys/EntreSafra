@@ -45,7 +45,7 @@ const LABELS = {
   local: "Local de trabalho", area: "Área", situacao: "Situação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "controle", axiagroFilter: "Todos", employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -375,15 +375,27 @@ function renderTruckDocuments() {
 function renderAxiagro() {
   const controls = state.data.modules.axiagroControle || [];
   const stock = state.data.modules.axiagroEstoque || [];
+  const duplicateValues = field => { const counts=new Map(); controls.forEach(row=>{const value=slug(row[field]);if(value)counts.set(value,(counts.get(value)||0)+1)});return new Set([...counts].filter(([,count])=>count>1).map(([value])=>value)); };
+  const duplicateMacs = duplicateValues("mac"); const duplicateSeals = duplicateValues("numeroLacre");
+  const issuesFor = row => { const issues=[]; if(slug(row.statusCelular).includes("no controle"))issues.push("Sem controle"); if(row.fusivel==="X"||slug(row.fusivel)==="-")issues.push("Fusível"); if(row.statusAparelho==="-"||isBlank(row.statusAparelho))issues.push("Aparelho"); if(/verificar|reforma|nao encontrado|não encontrado/i.test(`${row.statusSuporte} ${row.observacao}`))issues.push("Suporte"); if(!row.mac)issues.push("Sem MAC"); if(duplicateMacs.has(slug(row.mac)))issues.push("MAC duplicado"); if(duplicateSeals.has(slug(row.numeroLacre)))issues.push("Lacre duplicado"); return issues; };
+  const enriched = controls.map(row=>({...row,_issues:issuesFor(row)}));
   const active = controls.filter(row => ["ativo","campo","controle"].includes(slug(row.statusCelular))).length;
   const noControl = controls.filter(row => slug(row.statusCelular).includes("no controle")).length;
-  const attention = controls.filter(row => row.fusivel === "X" || row.statusAparelho === "-" || /verificar|reforma|nao encontrado|não encontrado/i.test(`${row.statusSuporte} ${row.observacao}`)).length;
+  const attention = enriched.filter(row => row._issues.length).length;
   const knownStock = stock.filter(row => Number.isFinite(Number(row.quantidade)));
   const totalStock = knownStock.reduce((sum,row) => sum + Number(row.quantidade), 0);
   const lowStock = knownStock.filter(row => Number(row.quantidade) <= 2).length;
   const query = slug(state.query);
-  const controlRows = controls.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
-  const stockRows = stock.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  let controlRows = enriched.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  let stockRows = stock.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  if(state.axiagroFilter==="Atenção")controlRows=controlRows.filter(row=>row._issues.length);
+  if(state.axiagroFilter==="Campo")controlRows=controlRows.filter(row=>slug(row.statusCelular)==="campo");
+  if(state.axiagroFilter==="Controle")controlRows=controlRows.filter(row=>slug(row.statusCelular)==="controle");
+  if(state.axiagroFilter==="Sem controle")controlRows=controlRows.filter(row=>slug(row.statusCelular).includes("no controle"));
+  if(state.axiagroFilter==="Duplicados")controlRows=controlRows.filter(row=>duplicateMacs.has(slug(row.mac))||duplicateSeals.has(slug(row.numeroLacre)));
+  if(state.axiagroFilter==="Sem estoque")stockRows=stockRows.filter(row=>Number(row.quantidade)===0);
+  if(state.axiagroFilter==="Estoque baixo")stockRows=stockRows.filter(row=>Number(row.quantidade)>0&&Number(row.quantidade)<=2);
+  if(state.axiagroFilter==="Disponível")stockRows=stockRows.filter(row=>Number(row.quantidade)>2);
   const controlColumns = MODULES.axiagroControle.columns;
   const stockColumns = MODULES.axiagroEstoque.columns;
   const isControl = state.axiagroTab === "controle";
@@ -393,16 +405,16 @@ function renderAxiagro() {
   return `${pageHeading("Controle AXIAGRO", MODULES.axiagro.description)}
     <div class="metrics axiagro-metrics">
       <article class="metric"><span class="label">Celulares cadastrados</span><strong>${controls.length}</strong><small>${active} ativos, em campo ou controle</small></article>
-      <article class="metric warning"><span class="label">Itens com atenção</span><strong>${attention}</strong><small>${noControl} marcados como sem controle</small></article>
+      <article class="metric warning"><span class="label">Controles com atenção</span><strong>${attention}</strong><small>${noControl} sem controle · ${duplicateMacs.size} MAC duplicados</small></article>
       <article class="metric"><span class="label">Itens no estoque</span><strong>${totalStock}</strong><small>${stock.length} tipos de equipamento</small></article>
       <article class="metric danger"><span class="label">Estoque baixo</span><strong>${lowStock}</strong><small>itens com quantidade até 2</small></article>
     </div>
     <section class="panel axiagro-panel">
       <div class="subnav"><button class="${isControl ? "active" : ""}" data-axiagro-tab="controle"><span>◉</span><div><strong>Celulares e suportes</strong><small>${controls.length} registros</small></div></button><button class="${!isControl ? "active" : ""}" data-axiagro-tab="estoque"><span>▦</span><div><strong>Estoque AXIAGRO</strong><small>${stock.length} equipamentos</small></div></button></div>
-      <div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar ${isControl ? "frota, MAC, lacre..." : "equipamento ou modelo..."}"></label><div class="spacer"></div><button class="primary-button" data-axiagro-new="${module}">＋ Adicionar ${isControl ? "controle" : "item"}</button></div>
+      <div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar ${isControl ? "frota, MAC, lacre..." : "equipamento ou modelo..."}"></label><div class="axiagro-filters">${(isControl?["Todos","Atenção","Campo","Controle","Sem controle","Duplicados"]:["Todos","Sem estoque","Estoque baixo","Disponível"]).map(value=>`<button class="filter-chip ${state.axiagroFilter===value?'active':''}" data-axiagro-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><button class="primary-button" data-axiagro-new="${module}">＋ Adicionar ${isControl ? "controle" : "item"}</button></div>
       <div class="table-wrap"><table><thead><tr>${columns.map(column => `<th>${LABELS[column] || column}</th>`).join("")}<th></th></tr></thead><tbody>
-        ${rows.length ? rows.map(row => `<tr data-open="${module}|${row.id}">${columns.map(column => `<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "statusCelular" || column === "statusSuporte" || column === "fusivel" || column === "statusAparelho" ? badge(row[column]) : column === "quantidade" && Number(row[column]) <= 2 ? `<span class="badge ${Number(row[column]) === 0 ? "danger" : "pending"}">${escapeHtml(row[column])}</span>` : formatValue(row[column], column)}</span></td>`).join("")}<td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("") : `<tr><td colspan="${columns.length+1}"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Ajuste sua busca.</div></td></tr>`}
-      </tbody></table></div><div class="table-footer"><span>${rows.length} registros exibidos</span><span>Dados transcritos dos controles AXIAGRO enviados</span></div>
+        ${rows.length ? rows.map(row => `<tr class="${isControl&&row._issues.length?'row-attention':''}" data-open="${module}|${row.id}">${columns.map(column => `<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "statusCelular" || column === "statusSuporte" || column === "fusivel" || column === "statusAparelho" ? badge(row[column]) : column === "mac" && duplicateMacs.has(slug(row.mac)) ? `<span class="badge danger" title="MAC repetido em mais de um controle">${escapeHtml(row.mac)} · duplicado</span>` : column === "numeroLacre" && duplicateSeals.has(slug(row.numeroLacre)) ? `<span class="badge pending">${escapeHtml(row.numeroLacre)} · duplicado</span>` : column === "quantidade" && Number(row[column]) <= 2 ? `<span class="stock-level"><b class="badge ${Number(row[column]) === 0 ? "danger" : "pending"}">${escapeHtml(row[column])}</b><i><span style="width:${Math.min(100,Number(row[column])*20)}%"></span></i><small>${Number(row[column])===0?'Repor agora':'Estoque baixo'}</small></span>` : formatValue(row[column], column)}</span></td>`).join("")}<td>${isControl?`<span class="axiagro-health ${row._issues.length?'warning':'ok'}" title="${escapeHtml(row._issues.join(', ')||'Controle regular')}">${row._issues.length?row._issues.length:'✓'}</span>`:''}<button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("") : `<tr><td colspan="${columns.length+1}"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Ajuste sua busca ou o filtro.</div></td></tr>`}
+      </tbody></table></div><div class="table-footer"><span>${rows.length} registros exibidos</span><span>${isControl?`${attention} controles exigem revisão`:`${lowStock} itens precisam de reposição`}</span></div>
     </section>`;
 }
 
@@ -497,7 +509,8 @@ function bindViewEvents() {
   $$('[data-document-view]').forEach(button => button.addEventListener("click", () => { state.documentView=button.dataset.documentView; render(); }));
   $$('[data-sort]').forEach(button => button.addEventListener("click", () => { const column=button.dataset.sort; state.sortDir=state.sortBy===column&&state.sortDir==='asc'?'desc':'asc'; state.sortBy=column; state.page=1; render(); }));
   $("[data-page-size]")?.addEventListener("change", event => { state.pageSize=Number(event.target.value); state.page=1; render(); });
-  $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.query = ""; render(); }));
+  $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.axiagroFilter="Todos"; state.query = ""; render(); }));
+  $$('[data-axiagro-filter]').forEach(button => button.addEventListener("click", () => { state.axiagroFilter=button.dataset.axiagroFilter; render(); }));
   $("[data-axiagro-new]")?.addEventListener("click", event => openForm(event.currentTarget.dataset.axiagroNew));
   $$('[data-employee-view]').forEach(button => button.addEventListener("click", () => { state.employeeView = button.dataset.employeeView; state.page = 1; render(); }));
   $$('[data-employee-location]').forEach(button => button.addEventListener("click", () => { state.employeeLocation = button.dataset.employeeLocation; state.employeeView = "list"; state.page = 1; render(); }));
