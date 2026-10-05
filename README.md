@@ -17,8 +17,7 @@ Dê dois cliques em `index.html`. O sistema funciona diretamente no navegador e 
 - documentação de caminhões e carretas;
 - central documental de caminhões com vencimentos, alertas, CRLV, ANTT, tacógrafo, completude, filtros rápidos e visualização em cartões ou tabela;
 - controle de rádios e curva S;
-- módulo AXIAGRO com controle de celulares, suportes, lacres, fusíveis, endereços MAC e estoque;
-- diagnóstico AXIAGRO com filtros de atenção, detecção de MAC/lacre duplicados e alertas inteligentes de reposição de estoque;
+- módulo AXIAGRO organizado em instalações por equipamento e estoque central de componentes;
 - instalações AXIAGRO por frota, com vínculo de celulares, cabos, carregadores, suportes e antenas e baixa/devolução automática no estoque;
 - distribuição de funcionários por local, com base de ativos, cadastro e movimentação entre equipes;
 - central avançada de equipes com busca por nome ou cadastro, turno, capacidade, situação, filtros, alerta de dupla alocação, duplicação e exportação CSV, preservando permanentemente o cadastro dos funcionários;
