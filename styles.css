@@ -27,6 +27,7 @@
 .auth-required h1 { margin:0; font-family:Manrope, sans-serif; font-size:clamp(24px,3vw,38px); }
 .auth-required p { max-width:440px; margin:0 0 12px; color:var(--muted); }
 .installation-status-line { display:block; margin-top:5px; color:var(--muted); font-size:11px; font-weight:700; }
+.ggomes-mark { background:linear-gradient(135deg,#0f766e,#22c55e); color:#fff; font-family:Manrope,sans-serif; letter-spacing:-.08em; box-shadow:0 8px 18px rgba(15,118,110,.25); }
 
 :root[data-theme="dark"] {
   --ink: #e8f0ed; --muted: #9cafaa; --line: #2c4540; --surface: #162a26; --canvas: #10201d;
