@@ -661,6 +661,7 @@ function openTeamDialog(teamId = null) {
 function saveTeam(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+  if (values.frota && state.data.modules.frotasBusca?.length && !state.data.modules.frotasBusca.some(item => String(item.frota).trim() === String(values.frota).trim())) return toast("Selecione uma frota existente na base Busca Frota.");
   const id = event.currentTarget.dataset.teamId;
   const teams = stored(TEAMS_KEY, []);
   if (id) {
