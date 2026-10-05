@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sistema de gestão de manutenções da entressafra, equipamentos, documentos e rádios.">
+  <title>EntreSafra · Gestão de Manutenções</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">ES</div>
+        <div><strong>EntreSafra</strong><span>Gestão de manutenção</span></div>
+      </div>
+      <nav id="mainNav" aria-label="Navegação principal"></nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" data-action="open-backup" title="Exportar cópia dos dados">
+          <span class="nav-icon">⇩</span><span>Backup dos dados</span>
+        </button>
+        <p><span class="status-dot"></span>Dados disponíveis offline</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-button mobile-only" id="menuButton" aria-label="Abrir menu">☰</button>
+        <div class="breadcrumb" id="breadcrumb">Visão geral</div>
+        <div class="top-actions">
+          <label class="global-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="globalSearch" type="search" placeholder="Buscar frota, placa, pendência..." autocomplete="off">
+            <kbd>Ctrl K</kbd>
+          </label>
+          <button class="icon-button theme-button" id="themeButton" aria-label="Alternar tema" title="Alternar tema">◐</button>
+          <button class="primary-button" id="newRecordButton"><span>＋</span>Novo registro</button>
+        </div>
+      </header>
+
+      <section id="app" class="content" aria-live="polite">
+        <div class="loading"><span></span>Carregando dados da planilha...</div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+  <dialog id="recordDialog" class="dialog">
+    <form method="dialog" id="recordForm">
+      <div class="dialog-header">
+        <div><span class="eyebrow" id="dialogEyebrow">Registro</span><h2 id="dialogTitle">Editar registro</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Fechar">×</button>
+      </div>
+      <div class="dialog-body" id="formFields"></div>
+      <div class="dialog-footer">
+        <button type="button" class="danger-button hidden" id="deleteButton">Excluir</button>
+        <div class="spacer"></div>
+        <button value="cancel" class="secondary-button">Cancelar</button>
+        <button type="submit" value="default" class="primary-button">Salvar alterações</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="dialog detail-dialog">
+    <div class="dialog-header">
+      <div><span class="eyebrow">Detalhes</span><h2 id="detailTitle">Registro</h2></div>
+      <button class="icon-button" data-close-detail aria-label="Fechar">×</button>
+    </div>
+    <div class="dialog-body" id="detailBody"></div>
+    <div class="dialog-footer">
+      <button class="secondary-button" data-close-detail>Fechar</button>
+      <button class="primary-button" id="editFromDetail">Editar registro</button>
+    </div>
+  </dialog>
+
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

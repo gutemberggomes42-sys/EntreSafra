@@ -1,0 +1,530 @@
+const MODULES = {
+  dashboard: { label: "Visão geral", icon: "◫", group: "Gestão" },
+  analytics: { label: "Análises e desempenho", icon: "⌁", group: "Gestão", title: "Análises e desempenho", description: "Indicadores comparativos, eficiência por categoria e visão executiva da entressafra." },
+  deadlines: { label: "Prazos e alertas", icon: "◷", group: "Gestão", title: "Central de prazos e alertas", description: "Reformas atrasadas, entregas próximas e documentos que exigem atenção." },
+  plantio: { label: "Equipamentos de plantio", icon: "⌁", group: "Operação", title: "Equipamentos de plantio", description: "Situação, pendências e previsão de entrega dos equipamentos das frentes 4001 e 4002.", key: "frota", columns: ["frota", "equipamento", "modelo", "frente", "status", "pendencias", "previsaoEntrega"] },
+  caminhoesReforma: { label: "Reforma de caminhões", icon: "▰", group: "Reformas", title: "Reforma de caminhões", description: "Acompanhamento de limpeza, localização, pendências e execução da reforma.", key: "frota", columns: ["frota", "placa", "funcao", "localizacao", "status", "pendencias", "inicio", "fim"] },
+  carretasReforma: { label: "Reforma de carretas", icon: "▱", group: "Reformas", title: "Reforma de implementos rodoviários", description: "Controle da reforma, limpeza, lubrificação, pneus e programação dos implementos.", key: "frota", columns: ["frota", "placa", "grupo", "funcao", "localizacao", "status", "pendencias", "inicio", "fim"] },
+  colhedoras: { label: "Colhedoras", icon: "◩", group: "Reformas", title: "Reforma de colhedoras", description: "Planejamento e andamento das reformas de colhedoras.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias", "inicio", "fim", "dias"] },
+  tratores: { label: "Tratores", icon: "◇", group: "Reformas", title: "Reforma de tratores", description: "Situação atual, local, pendências e duração prevista das reformas.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias", "inicio", "fim", "dias"] },
+  transbordos: { label: "Transbordos", icon: "▧", group: "Reformas", title: "Reforma de transbordos", description: "Programação, pendências e progresso dos transbordos.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias", "inicio", "fim", "dias"] },
+  vivencias: { label: "Vivências", icon: "⌂", group: "Reformas", title: "Reforma de vivências", description: "Acompanhamento das áreas de vivência usadas na operação.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias"] },
+  cci: { label: "Caminhões CCI", icon: "◈", group: "Reformas", title: "Caminhões de combate a incêndio", description: "Controle das reformas dos caminhões CCI e suas pendências.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias"] },
+  caminhoesInfo: { label: "Documentos de caminhões", icon: "▤", group: "Documentação", title: "Documentação dos caminhões", description: "Placas, ANTT, tacógrafos, CRLV, rádio, adesivos e vencimentos.", key: "frota", columns: ["frota", "placa", "ano", "operacao", "antt", "tacografo", "vencimento", "possuiCrlv", "radio", "pintura"] },
+  carretasInfo: { label: "Documentos de carretas", icon: "▥", group: "Documentação", title: "Documentação das carretas", description: "Placas, lacres, CRLV, ANTT, faixas e itens de segurança.", key: "frota", columns: ["frota", "placa", "grupo", "situacaoPlaca", "lacre", "possuiCrlv", "antt", "faixaParachoque", "faixaRefletiva", "observacao"] },
+  radios: { label: "Controle de rádios", icon: "⌁", group: "Controles", title: "Controle de rádios", description: "Identificação, frota, setor, disponibilidade e tipo de rádio.", key: "frota", columns: ["frota", "identificador", "descricao", "setor", "possuiRadio", "carregador", "tipo"] },
+  axiagro: { label: "AXIAGRO", icon: "◉", group: "Controles", title: "Controle AXIAGRO", description: "Gestão dos celulares, suportes, lacres, fusíveis, endereços MAC e estoque de equipamentos AXIAGRO." },
+  axiagroControle: { label: "AXIAGRO · Celulares", title: "Controle de celulares AXIAGRO", key: "frota", columns: ["frota", "frente", "statusCelular", "statusSuporte", "numeroLacre", "fusivel", "statusAparelho", "mac", "observacao"] },
+  axiagroEstoque: { label: "AXIAGRO · Estoque", title: "Estoque AXIAGRO", key: "equipamento", columns: ["equipamento", "modelo", "quantidade"] },
+  funcionarios: { label: "Distribuição de funcionários", icon: "♙", group: "Controles", title: "Distribuição de funcionários", description: "Cadastro e distribuição da equipe agrícola por local de trabalho.", key: "cadastro", columns: ["cadastro", "nome", "cargo", "local", "area", "admissao", "situacao", "observacao"] },
+  curvaS: { label: "Curva S e cronograma", icon: "⌇", group: "Controles", title: "Curva S e cronograma", description: "Planejado, realizado, manutenção, previsões e datas de execução.", key: "frota", columns: ["frota", "grupo", "funcao", "planejado", "realizado", "emManutencao", "previsao", "consideracoes", "inicioPlanejado", "fimPlanejado"] },
+  activity: { label: "Histórico de alterações", icon: "↻", group: "Dados", title: "Histórico de alterações", description: "Registro local das inclusões, edições e exclusões realizadas no sistema." },
+  raw: { label: "Planilha original", icon: "⊞", group: "Dados", title: "Consulta da planilha original", description: "Todos os dados importados, organizados por aba e linha para conferência." }
+};
+
+const LABELS = {
+  frota: "Frota", placa: "Placa", ano: "Ano", funcao: "Função", grupo: "Grupo", equipamento: "Equipamento",
+  modelo: "Modelo", frente: "Frente", status: "Situação", statusNormalizado: "Situação padronizada", pendencias: "Pendências",
+  localizacao: "Localização", inicio: "Início", fim: "Fim", dias: "Dias", previsaoEntrega: "Previsão de entrega",
+  identificador: "Identificador", descricao: "Descrição", setor: "Setor", possuiRadio: "Possui rádio", carregador: "Carregador", tipo: "Tipo",
+  operacao: "Operação", placaDianteira: "Placa dianteira", placaTraseira: "Placa traseira", antt: "ANTT", tacografo: "Tacógrafo",
+  orcamento: "Orçamento", dataAfericao: "Data de aferição", vencimento: "Vencimento", dnit: "DNIT", der: "DER", possuiCrlv: "Possui CRLV",
+  anoCrlv: "Ano CRLV", radio: "Rádio", adesivo: "Adesivo", tara: "Tara", pintura: "Pintura", limpeza: "Limpeza",
+  limpezaSeco: "Limpeza a seco", limpezaPipa: "Limpeza com pipa", porcasFaltantes: "Porcas de roda faltantes", parafusosFaltantes: "Parafusos faltantes",
+  lubrificacao: "Lubrificação", obsLubrificacao: "Observação da lubrificação", calibracao: "Calibração", pneus: "Pneus", conjunto: "Conjunto",
+  situacaoPlaca: "Situação da placa", lacre: "Lacre", numeroDianteiro: "Número dianteiro", numeros: "Números", adesivoVeiculoLongo: "Adesivo veículo longo",
+  faixaParachoque: "Faixa do para-choque", faixaRefletiva: "Faixa refletiva", cordaLonas: "Corda das lonas", caboSeguranca: "Cabo de segurança",
+  observacao: "Observação", planejado: "Planejado", realizado: "Realizado", emManutencao: "Em manutenção", previsao: "Previsão",
+  consideracoes: "Considerações", inicioPlanejado: "Início planejado", fimPlanejado: "Fim planejado", diasPlanejados: "Dias planejados",
+  entrada: "Entrada", saida: "Saída", diasTrabalhados: "Dias trabalhados", rc: "RC", cdc: "CDC"
+  ,statusCelular: "Status do celular", statusSuporte: "Status do suporte", numeroLacre: "Nº do lacre", fusivel: "Fusível",
+  statusAparelho: "Status do aparelho", mac: "MAC", quantidade: "Quantidade"
+  ,empresa: "Empresa", cadastro: "Cadastro", nome: "Nome do funcionário", admissao: "Admissão", cargo: "Cargo",
+  local: "Local de trabalho", area: "Área", situacao: "Situação"
+};
+
+const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, selected: null, rawSheet: null, viewMode: "table", axiagroTab: "controle", employeeLocation: "Todos", employeeView: "locations" };
+const PATCH_KEY = "entressafra-v1-patches";
+const NEW_KEY = "entressafra-v1-new";
+const DELETE_KEY = "entressafra-v1-deleted";
+const AUDIT_KEY = "entressafra-v1-audit";
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+const slug = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const isBlank = (value) => value === "" || value === null || value === undefined || value === " ";
+
+function stored(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+function applyLocalChanges() {
+  const patches = stored(PATCH_KEY, {});
+  const additions = stored(NEW_KEY, {});
+  const deleted = new Set(stored(DELETE_KEY, []));
+  Object.entries(state.data.modules).forEach(([module, rows]) => {
+    state.data.modules[module] = rows
+      .map(row => ({ ...row, ...(patches[row.id] || {}) }))
+      .filter(row => !deleted.has(row.id));
+    if (additions[module]) state.data.modules[module].push(...additions[module].filter(row => !deleted.has(row.id)));
+  });
+}
+
+function nav() {
+  const groups = [...new Set(Object.values(MODULES).map(item => item.group).filter(Boolean))];
+  $("#mainNav").innerHTML = groups.map(group => `
+    <div class="nav-label">${group}</div>
+    ${Object.entries(MODULES).filter(([, item]) => item.group === group).map(([key, item]) => `
+      <button class="nav-item ${state.route === key ? "active" : ""}" data-route="${key}">
+        <span class="nav-icon">${item.icon}</span><span>${item.label}</span>
+      </button>`).join("")}
+  `).join("");
+}
+
+function navigate(route) {
+  state.route = MODULES[route] ? route : "dashboard";
+  state.page = 1; state.status = "Todos"; state.rawSheet = null;
+  location.hash = state.route;
+  nav(); render();
+  $("#sidebar").classList.remove("open");
+}
+
+function allMaintenance() {
+  const keys = ["plantio", "caminhoesReforma", "carretasReforma", "colhedoras", "tratores", "transbordos", "vivencias", "cci"];
+  return keys.flatMap(module => state.data.modules[module].map(row => ({ ...row, _module: module })));
+}
+
+function normalizeStatus(record) {
+  const text = slug(record.statusNormalizado || record.status);
+  if (text.includes("conclu") || text.includes("feito") || text === "ok") return "Concluído";
+  if (text.includes("andamento") || text.includes("manutencao")) return "Em andamento";
+  if (text.includes("pend") || text.includes("aguard")) return "Pendente";
+  return "Não informado";
+}
+
+function badge(value, field = "") {
+  const text = String(value || "Não informado");
+  const norm = slug(text);
+  let klass = "";
+  if (norm.includes("no controle") || norm.includes("nao encontrado")) klass = "danger";
+  else if (norm.includes("feito") || norm.includes("conclu") || norm === "ok" || norm === "sim" || norm === "realizado" || norm === "ativo" || norm === "campo" || norm === "controle") klass = "done";
+  else if (norm.includes("andamento") || norm.includes("manutencao")) klass = "progress";
+  else if (norm.includes("pend") || norm.includes("aguard") || norm === "nao" || norm.includes("verificar")) klass = "pending";
+  else if (norm.includes("venc") || norm.includes("danific") || norm.includes("quebrado") || norm.includes("acidente")) klass = "danger";
+  return `<span class="badge ${klass}">${escapeHtml(text)}</span>`;
+}
+
+function formatValue(value, field) {
+  if (isBlank(value)) return '<span style="color:#a4afab">—</span>';
+  if (/data|inicio|fim|previsao|vencimento|entrada|saida/i.test(field) && /^\d{4}-\d{2}-\d{2}/.test(String(value))) {
+    const [year, month, day] = String(value).slice(0, 10).split("-");
+    return `${day}/${month}/${year}`;
+  }
+  if (/status|radio|antt|tacografo|crlv|limpeza|lacre|faixa|pintura|adesivo/i.test(field)) return badge(value, field);
+  return escapeHtml(value);
+}
+
+function pageHeading(title, description, actions = true) {
+  return `<div class="page-heading">
+    <div><span class="eyebrow">Controle EntreSafra</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div>
+    ${actions ? `<div class="heading-actions"><button class="secondary-button" data-action="print">Imprimir</button><button class="secondary-button" data-action="export-csv">Exportar CSV</button></div>` : ""}
+  </div>`;
+}
+
+function renderDashboard() {
+  const rows = allMaintenance();
+  const status = { "Concluído": 0, "Em andamento": 0, "Pendente": 0, "Não informado": 0 };
+  rows.forEach(row => status[normalizeStatus(row)]++);
+  const withPendencies = rows.filter(row => !isBlank(row.pendencias) && !["ok", "-", " "].includes(slug(row.pendencias))).length;
+  const infoTrucks = state.data.modules.caminhoesInfo;
+  const expired = infoTrucks.filter(row => slug(row.vencimento).includes("vencido") || slug(row.vencimento).includes("verificar")).length;
+  const total = rows.length || 1;
+  const completion = Math.round(status["Concluído"] / total * 100);
+  const categoryKeys = ["caminhoesReforma", "carretasReforma", "colhedoras", "tratores", "transbordos", "vivencias", "cci"];
+  const categories = categoryKeys.map(key => {
+    const list = state.data.modules[key];
+    return { key, total: list.length, done: list.filter(row => normalizeStatus(row) === "Concluído").length };
+  });
+  const alerts = rows.filter(row => normalizeStatus(row) !== "Concluído" && !isBlank(row.pendencias)).slice(0, 6);
+  const bars = Object.entries(status).filter(([name]) => name !== "Não informado").map(([name, count]) => {
+    const cls = name === "Pendente" ? "amber" : name === "Em andamento" ? "" : "";
+    return `<div class="status-row"><span>${name}</span><div class="bar ${cls}"><span style="width:${Math.round(count / total * 100)}%"></span></div><strong>${count}</strong></div>`;
+  }).join("");
+
+  return `${pageHeading("Gestão da manutenção", "Visão consolidada da entressafra: progresso das reformas, pendências críticas, documentação e ativos operacionais.", false)}
+    <div class="metrics">
+      <article class="metric"><span class="label">Equipamentos acompanhados</span><strong>${rows.length}</strong><small>${state.data.meta.sheetCount} abas importadas</small></article>
+      <article class="metric"><span class="label">Reformas concluídas</span><strong>${status["Concluído"]}</strong><small>${completion}% do total monitorado</small></article>
+      <article class="metric warning"><span class="label">Em andamento</span><strong>${status["Em andamento"]}</strong><small>${withPendencies} registros com observações</small></article>
+      <article class="metric danger"><span class="label">Documentos a verificar</span><strong>${expired}</strong><small>vencidos ou marcados para revisão</small></article>
+    </div>
+    <div class="dashboard-grid">
+      <div class="stack">
+        <section class="panel"><div class="panel-header"><div><h3>Progresso das reformas</h3><p>Consolidado dos módulos de manutenção</p></div><span class="badge done">${completion}% concluído</span></div><div class="panel-body status-bars">${bars}</div></section>
+        <section class="panel"><div class="panel-header"><div><h3>Resultado por categoria</h3><p>Equipamentos concluídos sobre o total cadastrado</p></div></div><div class="panel-body category-list">
+          ${categories.map(item => `<button class="category-item" data-route="${item.key}" style="width:100%;border:0;background:none;text-align:left;cursor:pointer"><strong>${MODULES[item.key].label}</strong><span>${item.done}/${item.total}</span><span>${item.total ? Math.round(item.done / item.total * 100) : 0}%</span></button>`).join("")}
+        </div></section>
+      </div>
+      <div class="stack">
+        <section class="panel"><div class="panel-header"><div><h3>Pendências recentes</h3><p>Itens que pedem acompanhamento</p></div></div><div class="panel-body alert-list">
+          ${alerts.length ? alerts.map(item => `<button class="alert ${normalizeStatus(item) === "Pendente" ? "red" : ""}" data-open="${item._module}|${item.id}" style="border-top:0;border-right:0;border-bottom:0;text-align:left;width:100%;cursor:pointer"><strong>Frota ${escapeHtml(item.frota || "não informada")} · ${MODULES[item._module].label}</strong><span>${escapeHtml(item.pendencias)}</span></button>`).join("") : "<div class='empty-state'><strong>Nenhuma pendência registrada</strong></div>"}
+        </div></section>
+        <section class="panel"><div class="panel-header"><div><h3>Base importada</h3><p>${escapeHtml(state.data.meta.sourceFile)}</p></div></div><div class="panel-body"><div class="category-list"><div class="category-item"><strong>Abas de origem</strong><span></span><span>${state.data.meta.sheetCount}</span></div><div class="category-item"><strong>Rádios cadastrados</strong><span></span><span>${state.data.modules.radios.length}</span></div><div class="category-item"><strong>Implementos rodoviários</strong><span></span><span>${state.data.modules.carretasReforma.length}</span></div></div></div></section>
+      </div>
+    </div>`;
+}
+
+function parseDate(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return new Date(`${text.slice(0, 10)}T12:00:00`);
+  const match = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return match ? new Date(`${match[3]}-${match[2].padStart(2,"0")}-${match[1].padStart(2,"0")}T12:00:00`) : null;
+}
+
+function maintenanceCategories() {
+  return ["caminhoesReforma", "carretasReforma", "colhedoras", "tratores", "transbordos", "vivencias", "cci"].map(key => {
+    const rows = state.data.modules[key];
+    const done = rows.filter(row => normalizeStatus(row) === "Concluído").length;
+    const progress = rows.filter(row => normalizeStatus(row) === "Em andamento").length;
+    const pending = rows.filter(row => normalizeStatus(row) === "Pendente").length;
+    return { key, label: MODULES[key].label, total: rows.length, done, progress, pending, rate: rows.length ? Math.round(done / rows.length * 100) : 0 };
+  });
+}
+
+function renderAnalytics() {
+  const categories = maintenanceCategories();
+  const total = categories.reduce((sum, item) => sum + item.total, 0);
+  const done = categories.reduce((sum, item) => sum + item.done, 0);
+  const progress = categories.reduce((sum, item) => sum + item.progress, 0);
+  const best = [...categories].sort((a,b) => b.rate - a.rate)[0];
+  const curve = state.data.modules.curvaS;
+  const planned = curve.reduce((sum,row) => sum + (Number(row.planejado) || 0), 0);
+  const realized = curve.reduce((sum,row) => sum + (Number(row.realizado) || 0), 0);
+  const maxTotal = Math.max(...categories.map(item => item.total), 1);
+  return `${pageHeading(MODULES.analytics.title, MODULES.analytics.description, false)}
+    <div class="metrics">
+      <article class="metric"><span class="label">Avanço consolidado</span><strong>${total ? Math.round(done/total*100) : 0}%</strong><small>${done} de ${total} reformas concluídas</small></article>
+      <article class="metric"><span class="label">Melhor desempenho</span><strong style="font-size:20px">${best.label}</strong><small>${best.rate}% concluído</small></article>
+      <article class="metric warning"><span class="label">Em execução</span><strong>${progress}</strong><small>equipamentos em andamento</small></article>
+      <article class="metric"><span class="label">Curva S realizada</span><strong>${planned ? Math.round(realized/planned*100) : 0}%</strong><small>${realized} realizados de ${planned} planejados</small></article>
+    </div>
+    <div class="analytics-grid">
+      <section class="panel"><div class="panel-header"><div><h3>Desempenho por categoria</h3><p>Comparativo entre concluído, em andamento e pendente</p></div></div><div class="panel-body chart-area">
+        ${categories.map(item => `<button class="chart-row" data-route="${item.key}"><span>${item.label}</span><div class="stacked-bar" title="${item.done} concluídos, ${item.progress} em andamento, ${item.pending} pendentes"><i class="done" style="width:${item.total ? item.done/item.total*100 : 0}%"></i><i class="progress" style="width:${item.total ? item.progress/item.total*100 : 0}%"></i><i class="pending" style="width:${item.total ? item.pending/item.total*100 : 0}%"></i></div><strong>${item.rate}%</strong></button>`).join("")}
+        <div class="chart-legend"><span><i class="done"></i>Concluído</span><span><i class="progress"></i>Em andamento</span><span><i class="pending"></i>Pendente</span></div>
+      </div></section>
+      <section class="panel"><div class="panel-header"><div><h3>Volume da frota</h3><p>Quantidade acompanhada em cada reforma</p></div></div><div class="panel-body vertical-chart">
+        ${categories.map(item => `<button data-route="${item.key}" title="${item.label}: ${item.total}"><strong>${item.total}</strong><span style="height:${Math.max(8,item.total/maxTotal*170)}px"></span><small>${item.label.replace("Reforma de ","").replace("Caminhões ","CCI ")}</small></button>`).join("")}
+      </div></section>
+    </div>
+    <section class="panel insight-panel"><div class="panel-header"><div><h3>Leitura executiva</h3><p>Pontos calculados automaticamente a partir da base atual</p></div></div><div class="insights">
+      ${categories.sort((a,b)=>a.rate-b.rate).slice(0,3).map((item,index)=>`<article><span class="insight-rank">0${index+1}</span><div><strong>${item.label}</strong><p>${item.pending} pendentes e ${item.progress} em andamento. Avanço atual de ${item.rate}%.</p></div><button class="secondary-button" data-route="${item.key}">Abrir</button></article>`).join("")}
+    </div></section>`;
+}
+
+function deadlineItems() {
+  const today = new Date(); today.setHours(12,0,0,0);
+  const items = [];
+  allMaintenance().forEach(row => {
+    const date = parseDate(row.fim || row.previsaoEntrega || row.previsao);
+    if (!date || normalizeStatus(row) === "Concluído") return;
+    const days = Math.ceil((date - today) / 86400000);
+    items.push({ ...row, date, days, kind: "Reforma", module: row._module });
+  });
+  state.data.modules.caminhoesInfo.forEach(row => {
+    const date = parseDate(row.vencimento);
+    const explicit = slug(row.vencimento).includes("vencido") || slug(row.vencimento).includes("verificar");
+    if (!date && !explicit) return;
+    const days = date ? Math.ceil((date - today) / 86400000) : -1;
+    if (days <= 90) items.push({ ...row, date, days, kind: "Documento", module: "caminhoesInfo" });
+  });
+  return items.sort((a,b) => a.days - b.days);
+}
+
+function renderDeadlines() {
+  const items = deadlineItems();
+  const late = items.filter(item => item.days < 0).length;
+  const critical = items.filter(item => item.days >= 0 && item.days <= 7).length;
+  const upcoming = items.filter(item => item.days > 7 && item.days <= 30).length;
+  return `${pageHeading(MODULES.deadlines.title, MODULES.deadlines.description, false)}
+    <div class="metrics compact-metrics"><article class="metric danger"><span class="label">Atrasados ou vencidos</span><strong>${late}</strong><small>ação imediata recomendada</small></article><article class="metric warning"><span class="label">Próximos 7 dias</span><strong>${critical}</strong><small>itens críticos</small></article><article class="metric"><span class="label">Próximos 30 dias</span><strong>${upcoming}</strong><small>programar atendimento</small></article><article class="metric"><span class="label">Total monitorado</span><strong>${items.length}</strong><small>prazos ativos</small></article></div>
+    <section class="panel"><div class="panel-header"><div><h3>Linha do tempo de atenção</h3><p>Ordenada pelos itens mais urgentes</p></div><span class="badge danger">${late} atrasados</span></div><div class="deadline-list">
+      ${items.length ? items.map(item => `<button class="deadline-item ${item.days < 0 ? "late" : item.days <= 7 ? "critical" : ""}" data-open="${item.module}|${item.id}"><span class="deadline-date"><strong>${item.date ? item.date.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}) : "Revisar"}</strong><small>${item.days < 0 ? `${Math.abs(item.days)}d atraso` : item.days === 0 ? "Hoje" : `${item.days} dias`}</small></span><span class="deadline-main"><strong>Frota ${escapeHtml(item.frota || "não informada")} · ${escapeHtml(item.kind)}</strong><small>${escapeHtml(MODULES[item.module].label)}${item.placa ? ` · ${escapeHtml(item.placa)}` : ""}</small></span><span>${badge(item.days < 0 ? "Atrasado" : item.days <= 7 ? "Crítico" : "Programado")}</span><span class="deadline-arrow">›</span></button>`).join("") : `<div class="empty-state"><strong>Nenhum prazo crítico</strong>Não há entregas ou documentos próximos do vencimento.</div>`}
+    </div></section>`;
+}
+
+function audit(action, module, record, details = "") {
+  const log = stored(AUDIT_KEY, []);
+  log.unshift({ id: Date.now(), action, module, record: record?.frota || record?.placa || record?.id || "Registro", details, at: new Date().toISOString() });
+  save(AUDIT_KEY, log.slice(0, 300));
+}
+
+function renderActivity() {
+  const log = stored(AUDIT_KEY, []);
+  return `${pageHeading(MODULES.activity.title, MODULES.activity.description, false)}<section class="panel"><div class="panel-header"><div><h3>Atividade local</h3><p>As ações ficam registradas somente neste navegador</p></div><span class="badge">${log.length} eventos</span></div><div class="activity-list">${log.length ? log.map(item => `<article class="activity-item"><span class="activity-icon ${slug(item.action)}">${item.action === "Exclusão" ? "−" : item.action === "Inclusão" ? "+" : "↻"}</span><div><strong>${escapeHtml(item.action)} · ${escapeHtml(item.record)}</strong><p>${escapeHtml(MODULES[item.module]?.label || item.module)}${item.details ? ` · ${escapeHtml(item.details)}` : ""}</p></div><time>${new Date(item.at).toLocaleString("pt-BR")}</time></article>`).join("") : `<div class="empty-state"><strong>Nenhuma alteração registrada</strong>As próximas inclusões, edições e exclusões aparecerão aqui.</div>`}</div></section>`;
+}
+
+function filteredRows(module) {
+  let rows = state.data.modules[module] || [];
+  const query = slug(state.query);
+  if (query) rows = rows.filter(row => slug(Object.values(row).join(" ")).includes(query));
+  if (state.status !== "Todos") rows = rows.filter(row => normalizeStatus(row) === state.status);
+  return rows;
+}
+
+function renderKanban(module, rows) {
+  const groups = ["Pendente", "Em andamento", "Concluído", "Não informado"];
+  return `<div class="kanban">${groups.map(group => {
+    const list = rows.filter(row => normalizeStatus(row) === group);
+    return `<section class="kanban-column"><header><span class="kanban-dot ${slug(group).replace(/\s+/g,"-")}"></span><strong>${group}</strong><span>${list.length}</span></header><div>${list.length ? list.map(row => `<button class="kanban-card" data-open="${module}|${row.id}"><span class="eyebrow">Frota ${escapeHtml(row.frota || "—")}</span><strong>${escapeHtml(row.placa || row.equipamento || row.funcao || "Equipamento")}</strong><p>${escapeHtml(row.pendencias || row.localizacao || "Sem observações")}</p>${row.fim || row.previsaoEntrega ? `<small>Prazo: ${formatValue(row.fim || row.previsaoEntrega,"fim")}</small>` : ""}</button>`).join("") : `<div class="kanban-empty">Nenhum item</div>`}</div></section>`;
+  }).join("")}</div>`;
+}
+
+function renderModule(module) {
+  const config = MODULES[module];
+  const rows = filteredRows(module);
+  const pages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+  state.page = Math.min(state.page, pages);
+  const start = (state.page - 1) * state.pageSize;
+  const visible = rows.slice(start, start + state.pageSize);
+  const hasStatus = (state.data.modules[module] || []).some(row => "status" in row);
+  const columns = config.columns;
+  const summary = hasStatus ? ["Concluído", "Em andamento", "Pendente"].map(name => ({name, count: rows.filter(row => normalizeStatus(row) === name).length})) : [];
+  return `${pageHeading(config.title, config.description)}
+    ${hasStatus ? `<div class="module-summary"><article><span>Total</span><strong>${rows.length}</strong></article>${summary.map(item => `<article><span>${item.name}</span><strong>${item.count}</strong></article>`).join("")}</div>` : ""}
+    <section class="panel">
+      <div class="toolbar">
+        <label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar neste módulo"></label>
+        ${hasStatus ? `<label class="field-inline"><span>Situação</span><select data-status-filter>${["Todos", "Concluído", "Em andamento", "Pendente", "Não informado"].map(value => `<option ${state.status === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>` : ""}
+        <div class="spacer"></div>${hasStatus ? `<div class="view-toggle"><button class="${state.viewMode === "table" ? "active" : ""}" data-view="table" title="Tabela">▤</button><button class="${state.viewMode === "kanban" ? "active" : ""}" data-view="kanban" title="Kanban">▦</button></div>` : ""}<span class="badge">${rows.length} registros</span>
+      </div>
+      ${hasStatus && state.viewMode === "kanban" ? renderKanban(module, rows) : `<div class="table-wrap"><table><thead><tr>${columns.map(column => `<th>${LABELS[column] || column}</th>`).join("")}<th></th></tr></thead>
+        <tbody>${visible.length ? visible.map(row => `<tr data-open="${module}|${row.id}">${columns.map(column => `<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${formatValue(row[column], column)}</span></td>`).join("")}<td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("") : `<tr><td colspan="${columns.length + 1}"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Experimente alterar os filtros ou a busca.</div></td></tr>`}</tbody>
+      </table></div>
+      <div class="table-footer"><span>Exibindo ${rows.length ? start + 1 : 0}–${Math.min(start + state.pageSize, rows.length)} de ${rows.length}</span><div class="pagination"><button data-page="${state.page - 1}" ${state.page <= 1 ? "disabled" : ""}>‹</button><span class="badge">${state.page} / ${pages}</span><button data-page="${state.page + 1}" ${state.page >= pages ? "disabled" : ""}>›</button></div></div>`}
+    </section>`;
+}
+
+function renderAxiagro() {
+  const controls = state.data.modules.axiagroControle || [];
+  const stock = state.data.modules.axiagroEstoque || [];
+  const active = controls.filter(row => ["ativo","campo","controle"].includes(slug(row.statusCelular))).length;
+  const noControl = controls.filter(row => slug(row.statusCelular).includes("no controle")).length;
+  const attention = controls.filter(row => row.fusivel === "X" || row.statusAparelho === "-" || /verificar|reforma|nao encontrado|não encontrado/i.test(`${row.statusSuporte} ${row.observacao}`)).length;
+  const knownStock = stock.filter(row => Number.isFinite(Number(row.quantidade)));
+  const totalStock = knownStock.reduce((sum,row) => sum + Number(row.quantidade), 0);
+  const lowStock = knownStock.filter(row => Number(row.quantidade) <= 2).length;
+  const query = slug(state.query);
+  const controlRows = controls.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  const stockRows = stock.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  const controlColumns = MODULES.axiagroControle.columns;
+  const stockColumns = MODULES.axiagroEstoque.columns;
+  const isControl = state.axiagroTab === "controle";
+  const rows = isControl ? controlRows : stockRows;
+  const columns = isControl ? controlColumns : stockColumns;
+  const module = isControl ? "axiagroControle" : "axiagroEstoque";
+  return `${pageHeading("Controle AXIAGRO", MODULES.axiagro.description)}
+    <div class="metrics axiagro-metrics">
+      <article class="metric"><span class="label">Celulares cadastrados</span><strong>${controls.length}</strong><small>${active} ativos, em campo ou controle</small></article>
+      <article class="metric warning"><span class="label">Itens com atenção</span><strong>${attention}</strong><small>${noControl} marcados como sem controle</small></article>
+      <article class="metric"><span class="label">Itens no estoque</span><strong>${totalStock}</strong><small>${stock.length} tipos de equipamento</small></article>
+      <article class="metric danger"><span class="label">Estoque baixo</span><strong>${lowStock}</strong><small>itens com quantidade até 2</small></article>
+    </div>
+    <section class="panel axiagro-panel">
+      <div class="subnav"><button class="${isControl ? "active" : ""}" data-axiagro-tab="controle"><span>◉</span><div><strong>Celulares e suportes</strong><small>${controls.length} registros</small></div></button><button class="${!isControl ? "active" : ""}" data-axiagro-tab="estoque"><span>▦</span><div><strong>Estoque AXIAGRO</strong><small>${stock.length} equipamentos</small></div></button></div>
+      <div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar ${isControl ? "frota, MAC, lacre..." : "equipamento ou modelo..."}"></label><div class="spacer"></div><button class="primary-button" data-axiagro-new="${module}">＋ Adicionar ${isControl ? "controle" : "item"}</button></div>
+      <div class="table-wrap"><table><thead><tr>${columns.map(column => `<th>${LABELS[column] || column}</th>`).join("")}<th></th></tr></thead><tbody>
+        ${rows.length ? rows.map(row => `<tr data-open="${module}|${row.id}">${columns.map(column => `<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "statusCelular" || column === "statusSuporte" || column === "fusivel" || column === "statusAparelho" ? badge(row[column]) : column === "quantidade" && Number(row[column]) <= 2 ? `<span class="badge ${Number(row[column]) === 0 ? "danger" : "pending"}">${escapeHtml(row[column])}</span>` : formatValue(row[column], column)}</span></td>`).join("")}<td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("") : `<tr><td colspan="${columns.length+1}"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Ajuste sua busca.</div></td></tr>`}
+      </tbody></table></div><div class="table-footer"><span>${rows.length} registros exibidos</span><span>Dados transcritos dos controles AXIAGRO enviados</span></div>
+    </section>`;
+}
+
+function renderEmployees() {
+  const source = state.data.modules.funcionarios || [];
+  const locations = [...new Set(source.map(row => row.local).filter(Boolean))].sort((a,b) => a.localeCompare(b,"pt-BR"));
+  const areas = [...new Set(source.map(row => row.area).filter(Boolean))];
+  const query = slug(state.query);
+  let rows = source.filter(row => !query || slug(Object.values(row).join(" ")).includes(query));
+  if (state.employeeLocation !== "Todos") rows = rows.filter(row => row.local === state.employeeLocation);
+  const locationStats = locations.map(local => {
+    const list = source.filter(row => row.local === local);
+    const roles = new Set(list.map(row => row.cargo).filter(Boolean));
+    return { local, count: list.length, roles: roles.size, area: list[0]?.area || "" };
+  }).sort((a,b) => b.count-a.count);
+  const recent = source.filter(row => String(row.admissao).endsWith("2026")).length;
+  const pageSize = 30;
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  state.page = Math.min(state.page, pages);
+  const visible = rows.slice((state.page-1)*pageSize, state.page*pageSize);
+  const columns = MODULES.funcionarios.columns;
+  return `${pageHeading("Distribuição de funcionários", "Organize a equipe por local de trabalho, consulte a base de ativos e cadastre novos colaboradores.")}
+    <div class="metrics employee-metrics"><article class="metric"><span class="label">Funcionários ativos</span><strong>${source.filter(row=>slug(row.situacao)==="ativo").length}</strong><small>${source.length} registros na base</small></article><article class="metric"><span class="label">Locais de trabalho</span><strong>${locations.length}</strong><small>equipes distribuídas por operação</small></article><article class="metric"><span class="label">Áreas</span><strong>${areas.length}</strong><small>${areas.map(escapeHtml).join(" e ")}</small></article><article class="metric"><span class="label">Admissões em 2026</span><strong>${recent}</strong><small>colaboradores admitidos no ano</small></article></div>
+    <section class="panel employee-panel">
+      <div class="toolbar employee-toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar nome, cadastro ou cargo"></label><label class="field-inline"><span>Local</span><select data-location-filter><option>Todos</option>${locations.map(local=>`<option ${state.employeeLocation===local?"selected":""}>${escapeHtml(local)}</option>`).join("")}</select></label><div class="spacer"></div><div class="view-toggle"><button class="${state.employeeView==="locations"?"active":""}" data-employee-view="locations" title="Locais">▦</button><button class="${state.employeeView==="list"?"active":""}" data-employee-view="list" title="Lista">▤</button></div><span class="badge">${rows.length} funcionários</span></div>
+      ${state.employeeView === "locations" && state.employeeLocation === "Todos" ? `<div class="location-grid">${locationStats.map((item,index)=>`<button class="location-card" data-employee-location="${escapeHtml(item.local)}"><span class="location-index">${String(index+1).padStart(2,"0")}</span><div><strong>${escapeHtml(item.local)}</strong><small>${escapeHtml(item.area)}</small></div><span class="location-count"><strong>${item.count}</strong><small>pessoas</small></span><div class="location-bar"><i style="width:${item.count/locationStats[0].count*100}%"></i></div><footer>${item.roles} cargos diferentes <b>Ver equipe →</b></footer></button>`).join("")}</div>` : `<div class="employee-context">${state.employeeLocation !== "Todos" ? `<button class="secondary-button" data-clear-location>← Todos os locais</button><div><span class="eyebrow">Equipe selecionada</span><h3>${escapeHtml(state.employeeLocation)}</h3></div>` : `<div><span class="eyebrow">Base completa</span><h3>Todos os funcionários</h3></div>`}</div><div class="table-wrap"><table><thead><tr>${columns.map(column=>`<th>${LABELS[column]}</th>`).join("")}<th></th></tr></thead><tbody>${visible.map(row=>`<tr data-open="funcionarios|${row.id}">${columns.map(column=>`<td><span class="cell-truncate" title="${escapeHtml(row[column])}">${column === "situacao" ? badge(row[column]) : formatValue(row[column],column)}</span></td>`).join("")}<td><button class="row-action" data-edit="funcionarios|${row.id}" aria-label="Editar">•••</button></td></tr>`).join("")}</tbody></table></div><div class="table-footer"><span>Exibindo ${rows.length?(state.page-1)*pageSize+1:0}–${Math.min(state.page*pageSize,rows.length)} de ${rows.length}</span><div class="pagination"><button data-page="${state.page-1}" ${state.page<=1?"disabled":""}>‹</button><span class="badge">${state.page} / ${pages}</span><button data-page="${state.page+1}" ${state.page>=pages?"disabled":""}>›</button></div></div>`}
+    </section>`;
+}
+
+function renderRaw() {
+  if (!state.rawSheet) {
+    return `${pageHeading(MODULES.raw.title, MODULES.raw.description, false)}<div class="sheet-grid">${state.data.rawSheets.map((sheet, index) => `<button class="sheet-card" data-raw-sheet="${index}"><strong>${escapeHtml(sheet.name)}</strong><span>${sheet.rows.length} linhas com dados · ${sheet.maxColumn} colunas</span></button>`).join("")}</div>`;
+  }
+  const sheet = state.data.rawSheets[state.rawSheet.index];
+  const maxCols = Math.max(...sheet.rows.map(row => row.values.length));
+  const letters = Array.from({ length: maxCols }, (_, i) => {
+    let n = i + 1, text = ""; while (n) { n--; text = String.fromCharCode(65 + (n % 26)) + text; n = Math.floor(n / 26); } return text;
+  });
+  return `${pageHeading(sheet.name, `${sheet.rows.length} linhas importadas da aba original.`, false)}<div style="margin-bottom:12px"><button class="secondary-button" data-back-raw>← Voltar às abas</button></div><section class="panel"><div class="table-wrap"><table class="raw-table"><thead><tr><th>Linha</th>${letters.map(l => `<th>${l}</th>`).join("")}</tr></thead><tbody>${sheet.rows.map(row => `<tr><td>${row.row}</td>${letters.map((_, i) => `<td>${formatValue(row.values[i] || "", "raw")}</td>`).join("")}</tr>`).join("")}</tbody></table></div></section>`;
+}
+
+function render() {
+  $("#breadcrumb").textContent = MODULES[state.route].label;
+  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "axiagro", "activity", "raw"].includes(state.route));
+  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
+  $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
+  bindViewEvents();
+}
+
+function bindViewEvents() {
+  $$('[data-route]', $("#app")).forEach(button => button.addEventListener("click", () => navigate(button.dataset.route)));
+  $$('[data-open]').forEach(element => element.addEventListener("click", event => {
+    if (event.target.closest("[data-edit]")) return;
+    const [module, id] = element.dataset.open.split("|"); openDetails(module, id);
+  }));
+  $$('[data-edit]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [module, id] = button.dataset.edit.split("|"); openForm(module, id); }));
+  const localSearch = $("[data-local-search]");
+  if (localSearch) localSearch.addEventListener("input", event => { state.query = event.target.value; state.page = 1; render(); requestAnimationFrame(() => { const input = $("[data-local-search]"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); });
+  const statusFilter = $("[data-status-filter]");
+  if (statusFilter) statusFilter.addEventListener("change", event => { state.status = event.target.value; state.page = 1; render(); });
+  $$('[data-page]').forEach(button => button.addEventListener("click", () => { state.page = Number(button.dataset.page); render(); }));
+  $$('[data-view]').forEach(button => button.addEventListener("click", () => { state.viewMode = button.dataset.view; render(); }));
+  $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.query = ""; render(); }));
+  $("[data-axiagro-new]")?.addEventListener("click", event => openForm(event.currentTarget.dataset.axiagroNew));
+  $$('[data-employee-view]').forEach(button => button.addEventListener("click", () => { state.employeeView = button.dataset.employeeView; state.page = 1; render(); }));
+  $$('[data-employee-location]').forEach(button => button.addEventListener("click", () => { state.employeeLocation = button.dataset.employeeLocation; state.employeeView = "list"; state.page = 1; render(); }));
+  $("[data-location-filter]")?.addEventListener("change", event => { state.employeeLocation = event.target.value; state.employeeView = event.target.value === "Todos" ? state.employeeView : "list"; state.page = 1; render(); });
+  $("[data-clear-location]")?.addEventListener("click", () => { state.employeeLocation = "Todos"; state.employeeView = "locations"; state.page = 1; render(); });
+  $$('[data-action="print"]').forEach(button => button.addEventListener("click", () => print()));
+  $$('[data-action="export-csv"]').forEach(button => button.addEventListener("click", () => exportCsv(state.route)));
+  $$('[data-raw-sheet]').forEach(button => button.addEventListener("click", () => { state.rawSheet = { index: Number(button.dataset.rawSheet) }; render(); }));
+  $("[data-back-raw]")?.addEventListener("click", () => { state.rawSheet = null; render(); });
+}
+
+function findRecord(module, id) { return (state.data.modules[module] || []).find(row => row.id === id); }
+function openDetails(module, id) {
+  const record = findRecord(module, id); if (!record) return;
+  state.selected = { module, id };
+  $("#detailTitle").textContent = `${MODULES[module].label} · ${record.frota || record.placa || "Registro"}`;
+  $("#detailBody").innerHTML = `<div class="detail-grid">${Object.entries(record).filter(([key]) => !key.startsWith("_") && !["id", "statusNormalizado"].includes(key)).map(([key, value]) => `<div class="detail-item"><span>${LABELS[key] || key}</span><strong>${formatValue(value, key)}</strong></div>`).join("")}</div>`;
+  $("#detailDialog").showModal();
+}
+
+function inputType(field, value) {
+  if (/data|inicio|fim|previsao|vencimento|entrada|saida/i.test(field) && (/^\d{4}-\d{2}-\d{2}/.test(String(value)) || isBlank(value))) return "date";
+  if (["ano", "dias", "grupo", "planejado", "realizado", "emManutencao", "diasPlanejados", "diasTrabalhados", "porcasFaltantes", "parafusosFaltantes"].includes(field)) return "number";
+  return "text";
+}
+
+function openForm(module = state.route, id = null) {
+  const config = MODULES[module];
+  const original = id ? findRecord(module, id) : {};
+  if (!config || !config.columns) return;
+  state.selected = { module, id };
+  const fields = [...new Set([...config.columns, ...Object.keys(original).filter(key => !key.startsWith("_") && !["id", "statusNormalizado"].includes(key))])];
+  $("#dialogEyebrow").textContent = config.label;
+  $("#dialogTitle").textContent = id ? "Editar registro" : "Novo registro";
+  $("#deleteButton").classList.toggle("hidden", !id);
+  $("#formFields").innerHTML = `<div class="form-grid">${fields.map(field => {
+    const value = original[field] ?? "";
+    const isLong = /pendencia|observacao|considera|descricao/i.test(field);
+    if (module === "funcionarios" && field === "local") {
+      const locations = [...new Set((state.data.modules.funcionarios || []).map(row => row.local).filter(Boolean))].sort();
+      return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><input id="field-${field}" name="${field}" list="employee-location-options" value="${escapeHtml(value)}" placeholder="Selecione ou digite um novo local"><datalist id="employee-location-options">${locations.map(local=>`<option value="${escapeHtml(local)}"></option>`).join("")}</datalist></div>`;
+    }
+    if (module === "funcionarios" && field === "situacao") return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><select id="field-${field}" name="${field}">${[value,"Ativo","Férias","Afastado","Inativo"].filter((v,i,a)=>v&&a.indexOf(v)===i).map(v=>`<option ${v===value?"selected":""}>${escapeHtml(v)}</option>`).join("")}</select></div>`;
+    if (field === "status") return `<div class="form-field"><label for="field-${field}">${LABELS[field]}</label><select id="field-${field}" name="${field}">${[value, "FEITO", "FEITO (C/ Pend)", "EM ANDAMENTO", "PENDENTE", "AG. MANUTENÇÃO"].filter((v, i, a) => v && a.indexOf(v) === i).map(v => `<option ${v === value ? "selected" : ""}>${escapeHtml(v)}</option>`).join("")}</select></div>`;
+    return `<div class="form-field ${isLong ? "wide" : ""}"><label for="field-${field}">${LABELS[field] || field}</label>${isLong ? `<textarea id="field-${field}" name="${field}">${escapeHtml(value)}</textarea>` : `<input id="field-${field}" name="${field}" type="${inputType(field, value)}" value="${escapeHtml(String(value).slice(0, 10) === String(value) || inputType(field, value) !== "date" ? value : String(value).slice(0, 10))}">`}</div>`;
+  }).join("")}</div>`;
+  $("#recordDialog").showModal();
+}
+
+function persistForm(event) {
+  event.preventDefault();
+  const { module, id } = state.selected;
+  const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+  if ("status" in values) values.statusNormalizado = normalizeStatus(values);
+  if (id) {
+    const patches = stored(PATCH_KEY, {}); patches[id] = { ...(patches[id] || {}), ...values }; save(PATCH_KEY, patches);
+    Object.assign(findRecord(module, id), values); audit("Edição", module, findRecord(module, id), "Campos atualizados"); toast("Registro atualizado com sucesso.");
+  } else {
+    const additions = stored(NEW_KEY, {}); const record = { ...values, id: `${module}-novo-${Date.now()}`, _sourceRow: "Novo" };
+    (additions[module] ||= []).push(record); save(NEW_KEY, additions); state.data.modules[module].push(record); audit("Inclusão", module, record, "Novo registro criado"); toast("Novo registro adicionado.");
+  }
+  $("#recordDialog").close(); render();
+}
+
+function deleteSelected() {
+  const { module, id } = state.selected;
+  if (!id || !confirm("Excluir este registro do sistema? A linha original continuará disponível na consulta da planilha.")) return;
+  const removedRecord = findRecord(module, id);
+  const deleted = stored(DELETE_KEY, []); if (!deleted.includes(id)) deleted.push(id); save(DELETE_KEY, deleted);
+  state.data.modules[module] = state.data.modules[module].filter(row => row.id !== id);
+  audit("Exclusão", module, removedRecord || { id }, "Registro removido da visão operacional");
+  $("#recordDialog").close(); toast("Registro excluído do sistema."); render();
+}
+
+function csvValue(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
+function exportCsv(module) {
+  if (module === "axiagro") module = state.axiagroTab === "controle" ? "axiagroControle" : "axiagroEstoque";
+  const config = MODULES[module]; if (!config?.columns) return;
+  const rows = filteredRows(module); const columns = config.columns;
+  const csv = "\ufeff" + [columns.map(column => csvValue(LABELS[column] || column)).join(";"), ...rows.map(row => columns.map(column => csvValue(row[column])).join(";"))].join("\r\n");
+  download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${module}-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+function backup() {
+  const payload = { generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []) };
+  download(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `backup-entressafra-${new Date().toISOString().slice(0, 10)}.json`); toast("Backup dos dados gerado.");
+}
+function toast(message) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), 3000); }
+
+function bindGlobalEvents() {
+  $("#mainNav").addEventListener("click", event => { const button = event.target.closest("[data-route]"); if (button) navigate(button.dataset.route); });
+  $("#menuButton").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  $("#newRecordButton").addEventListener("click", () => openForm());
+  $("#themeButton").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next; localStorage.setItem("entressafra-theme", next); toast(`Tema ${next === "dark" ? "escuro" : "claro"} ativado.`);
+  });
+  $("#recordForm").addEventListener("submit", persistForm);
+  $("#deleteButton").addEventListener("click", deleteSelected);
+  $$('[data-close-detail]').forEach(button => button.addEventListener("click", () => $("#detailDialog").close()));
+  $("#editFromDetail").addEventListener("click", () => { const selected = { ...state.selected }; $("#detailDialog").close(); openForm(selected.module, selected.id); });
+  $("#sidebar").addEventListener("click", event => { if (event.target.closest('[data-action="open-backup"]')) backup(); });
+  $("#globalSearch").addEventListener("input", event => { state.query = event.target.value; if (state.route === "dashboard" || state.route === "raw") state.route = "plantio"; state.page = 1; nav(); render(); });
+  document.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); $("#globalSearch").focus(); } });
+  window.addEventListener("hashchange", () => { const route = location.hash.slice(1); if (MODULES[route] && route !== state.route) navigate(route); });
+}
+
+async function init() {
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem("entressafra-theme") || "light";
+    if (window.__ENTRESSAFRA_DATA__) {
+      state.data = window.__ENTRESSAFRA_DATA__;
+    } else {
+      const response = await fetch("data.json");
+      if (!response.ok) throw new Error("Falha ao carregar data.json");
+      state.data = await response.json();
+    }
+    applyLocalChanges();
+    state.route = MODULES[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
+    bindGlobalEvents(); nav(); render();
+  } catch (error) {
+    $("#app").innerHTML = `<div class="empty-state"><strong>Não foi possível abrir os dados</strong>Inicie o sistema pelo servidor local para carregar a base da planilha.<br><small>${escapeHtml(error.message)}</small></div>`;
+  }
+}
+
+init();

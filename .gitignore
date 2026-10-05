@@ -1,0 +1,18 @@
+.vendor/
+__pycache__/
+*.pyc
+
+# Arquivos auxiliares de inspeção e importação local
+ativos_agricola_raw.json
+workbook_inventory.json
+workbook_rows.txt
+inspect_ativos.ps1
+inspect_workbook.py
+summarize_workbook.py
+funcionarios_import.json
+
+# Arquivos do sistema operacional e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
