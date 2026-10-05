@@ -38,6 +38,7 @@
             <kbd>Ctrl K</kbd>
           </label>
           <button class="icon-button theme-button" id="themeButton" aria-label="Alternar tema" title="Alternar tema">◐</button>
+          <button class="secondary-button auth-button" id="authButton" type="button">Entrar</button>
           <button class="primary-button" id="newRecordButton"><span>＋</span>Novo registro</button>
         </div>
       </header>
@@ -83,6 +84,14 @@
       <div class="dialog-header"><div><span class="eyebrow">Distribuição de funcionários</span><h2 id="teamDialogTitle">Nova equipe</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
         <div class="dialog-body"><div class="form-grid"><div class="form-field wide"><label for="teamName">Nome da equipe</label><input id="teamName" name="name" required placeholder="Ex.: Equipe Frente 4001"></div><div class="form-field"><label for="teamLocation">Local de referência</label><input id="teamLocation" name="location" placeholder="Ex.: COLHEDEIRA DA CANA - CAMBUI"></div><div class="form-field"><label for="teamLeader">Responsável</label><input id="teamLeader" name="leader" placeholder="Nome do líder"></div><div class="form-field"><label for="teamShift">Turno</label><select id="teamShift" name="shift"><option>Não informado</option><option>Diurno</option><option>Noturno</option><option>Turno A</option><option>Turno B</option><option>Turno C</option></select></div><div class="form-field"><label for="teamStatus">Situação</label><select id="teamStatus" name="status"><option>Ativa</option><option>Planejada</option><option>Suspensa</option><option>Encerrada</option></select></div><div class="form-field"><label for="teamCapacity">Capacidade planejada</label><input id="teamCapacity" name="capacity" type="number" min="0" placeholder="Ex.: 20"></div><div class="form-field wide"><label for="teamDescription">Observação</label><textarea id="teamDescription" name="description" placeholder="Finalidade, turno ou observações da equipe"></textarea></div></div></div>
       <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Salvar equipe</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="authDialog" class="dialog auth-dialog">
+    <form method="dialog" id="authForm">
+      <div class="dialog-header"><div><span class="eyebrow">Firebase seguro</span><h2>Acesso ao sistema</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><p class="auth-intro">Entre com um usuário autorizado para sincronizar os dados entre computadores.</p><div class="form-grid"><div class="form-field wide"><label for="authEmail">E-mail</label><input id="authEmail" name="email" type="email" autocomplete="username" required placeholder="usuario@empresa.com"></div><div class="form-field wide"><label for="authPassword">Senha</label><input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="Mínimo de 6 caracteres"></div></div><p class="auth-error" id="authError" role="alert"></p></div>
+      <div class="dialog-footer"><button type="button" class="secondary-button" id="registerButton">Criar primeiro usuário</button><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Entrar e sincronizar</button></div>
     </form>
   </dialog>
 

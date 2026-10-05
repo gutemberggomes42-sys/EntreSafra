@@ -32,4 +32,4 @@ Os dados originais ficam preservados em `data.json` e `data.js`. Alterações fe
 
 O sistema está configurado para o projeto `entresafra-17974` e sincroniza alterações, novos registros, exclusões lógicas, equipes e auditoria no documento `entressafra/workspace` do Cloud Firestore. Enquanto o Firestore estiver indisponível, o sistema mantém todas as alterações localmente e retoma a sincronização quando a conexão voltar.
 
-Antes do primeiro uso em nuvem, crie/ative o banco **Cloud Firestore** no Console Firebase e configure regras de acesso adequadas aos usuários da empresa. Não use regras públicas em produção.
+O acesso usa Firebase Authentication com e-mail e senha. Antes do primeiro login, ative o provedor **E-mail/senha** no Console Firebase e publique `firestore.rules`; essas regras permitem acesso somente a usuários autenticados. A interface permite criar o primeiro usuário e depois entrar com ele. Não use regras públicas em produção.
