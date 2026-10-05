@@ -27,3 +27,9 @@ Dê dois cliques em `index.html`. O sistema funciona diretamente no navegador e 
 - consulta completa de todas as abas e linhas da planilha original.
 
 Os dados originais ficam preservados em `data.json` e `data.js`. Alterações feitas pela interface são salvas pelo navegador e podem ser exportadas pelo botão **Backup dos dados**.
+
+## Firebase
+
+O sistema está configurado para o projeto `entresafra-17974` e sincroniza alterações, novos registros, exclusões lógicas, equipes e auditoria no documento `entressafra/workspace` do Cloud Firestore. Enquanto o Firestore estiver indisponível, o sistema mantém todas as alterações localmente e retoma a sincronização quando a conexão voltar.
+
+Antes do primeiro uso em nuvem, crie/ative o banco **Cloud Firestore** no Console Firebase e configure regras de acesso adequadas aos usuários da empresa. Não use regras públicas em produção.

@@ -55,6 +55,7 @@ nav { display: grid; gap: 5px; overflow: auto; scrollbar-width: thin; padding-ri
 .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.1); }
 .sidebar-footer p { margin: 14px 12px 0; color: #91ada6; font-size: 11px; }
 .status-dot { width: 7px; height: 7px; background: #6fd49f; display: inline-block; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 0 4px rgba(111,212,159,.1); }
+.status-dot[data-mode="syncing"] { background:#e7b33f; box-shadow:0 0 0 4px rgba(231,179,63,.16); animation:pulse 1s infinite; }.status-dot[data-mode="offline"] { background:#e06b62; box-shadow:0 0 0 4px rgba(224,107,98,.14); }@keyframes pulse{50%{opacity:.45}}
 
 .main { grid-column: 2; min-width: 0; }
 .topbar { height: 72px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 30px; background: rgba(244,246,243,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }

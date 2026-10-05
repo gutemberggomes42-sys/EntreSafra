@@ -61,7 +61,7 @@ const isBlank = (value) => value === "" || value === null || value === undefined
 function stored(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
-function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); window.FirebaseSync?.queue?.(); }
 
 function applyLocalChanges() {
   const patches = stored(PATCH_KEY, {});
@@ -671,6 +671,7 @@ async function init() {
       if (!response.ok) throw new Error("Falha ao carregar data.json");
       state.data = await response.json();
     }
+    await Promise.race([window.firebaseSyncReady || Promise.resolve(false), new Promise(resolve => setTimeout(() => resolve(false), 5000))]);
     applyLocalChanges();
     state.route = MODULES[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
     bindGlobalEvents(); nav(); render();
