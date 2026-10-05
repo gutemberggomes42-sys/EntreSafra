@@ -586,12 +586,14 @@ function bindViewEvents() {
 
 function openInstallationDialog(installationId=null){
   const installation=stored(AXIAGRO_INSTALLATIONS_KEY,[]).find(item=>item.id===installationId)||{};
+  const fleetInput=$("#installationFleet"); const fleetOptions=$("#installation-fleet-options") || document.createElement("datalist"); fleetOptions.id="installation-fleet-options"; fleetOptions.innerHTML=(state.data.modules.frotasBusca||[]).map(item=>`<option value="${escapeHtml(item.frota)}">${escapeHtml(`${item.equipamento} · ${item.placa||item.chassi||'sem identificação'}`)}</option>`).join(""); if(!fleetOptions.parentElement) document.body.appendChild(fleetOptions); fleetInput?.setAttribute("list","installation-fleet-options");
   $("#installationFleet").value=installation.fleet||""; $("#installationFront").value=installation.front||""; $("#installationDescription").value=installation.description||""; $("#installationLocation").value=installation.location||""; $("#installationStatus").value=installation.operationalStatus||"Em operação";
   $("#installationForm").dataset.installationId=installationId||""; $("#installationDialog").showModal();
 }
 
 function saveInstallation(event){
   event.preventDefault(); const values=Object.fromEntries(new FormData(event.currentTarget).entries()); const id=event.currentTarget.dataset.installationId; const installations=stored(AXIAGRO_INSTALLATIONS_KEY,[]);
+  if (state.data.modules.frotasBusca?.length && !state.data.modules.frotasBusca.some(item => String(item.frota).trim() === String(values.fleet).trim())) return toast("Selecione uma frota existente na Busca Frota.");
   if(id){const item=installations.find(entry=>entry.id===id);if(item)Object.assign(item,values,{updatedAt:new Date().toISOString()});}
   else {const item={id:`installation-${Date.now()}`,...values,items:[],createdAt:new Date().toISOString()};installations.push(item);state.selectedAxiagroInstallation=item.id;}
   save(AXIAGRO_INSTALLATIONS_KEY,installations); audit(id?"Edição":"Inclusão","axiagroControle",{id:id||state.selectedAxiagroInstallation,frota:values.fleet},"Equipamento AXIAGRO"); $("#installationDialog").close(); toast("Equipamento AXIAGRO salvo."); render();
