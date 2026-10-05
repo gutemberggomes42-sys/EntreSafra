@@ -18,7 +18,7 @@ const MODULES = {
   axiagro: { label: "AXIAGRO", icon: "◉", group: "Controles", title: "Controle AXIAGRO", description: "Gestão dos celulares, suportes, lacres, fusíveis, endereços MAC e estoque de equipamentos AXIAGRO." },
   axiagroControle: { label: "AXIAGRO · Celulares", title: "Controle de celulares AXIAGRO", key: "frota", columns: ["frota", "frente", "statusCelular", "statusSuporte", "numeroLacre", "fusivel", "statusAparelho", "mac", "observacao"] },
   axiagroEstoque: { label: "AXIAGRO · Estoque", title: "Estoque AXIAGRO", key: "equipamento", columns: ["equipamento", "modelo", "quantidade"] },
-  frotasBusca: { label: "Busca Frota · Usina", icon: "▦", group: "Cadastros", title: "Frotas cadastradas da usina", description: "Base oficial da Busca Frota para seleção segura de equipamentos.", key: "frota", columns: ["frota", "equipamento", "modelo", "ano", "placa", "chassi", "situacao", "grupo", "departamento", "empresa"] },
+  frotasBusca: { label: "Busca Frota · Usina", icon: "▦", group: "Cadastros", title: "Frotas cadastradas da usina", description: "Base oficial da Busca Frota para seleção segura de equipamentos.", key: "frota", columns: ["numeroEquipamento", "numeroFrota", "equipamento", "modelo", "ano", "placa", "chassi", "situacao", "grupo", "departamento", "empresa"] },
   funcionarios: { label: "Distribuição de funcionários", icon: "♙", group: "Controles", title: "Distribuição de funcionários", description: "Cadastro e distribuição da equipe agrícola por local de trabalho.", key: "cadastro", columns: ["cadastro", "nome", "cargo", "local", "area", "admissao", "situacao", "observacao"] },
   curvaS: { label: "Curva S e cronograma", icon: "⌇", group: "Controles", title: "Curva S e cronograma", description: "Planejado, realizado, manutenção, previsões e datas de execução.", key: "frota", columns: ["frota", "grupo", "funcao", "planejado", "realizado", "emManutencao", "previsao", "consideracoes", "inicioPlanejado", "fimPlanejado"] },
   activity: { label: "Histórico de alterações", icon: "↻", group: "Dados", title: "Histórico de alterações", description: "Registro local das inclusões, edições e exclusões realizadas no sistema." },
@@ -43,10 +43,10 @@ const LABELS = {
   ,statusCelular: "Status do celular", statusSuporte: "Status do suporte", numeroLacre: "Nº do lacre", fusivel: "Fusível",
   statusAparelho: "Status do aparelho", mac: "MAC", quantidade: "Quantidade"
   ,empresa: "Empresa", cadastro: "Cadastro", nome: "Nome do funcionário", admissao: "Admissão", cargo: "Cargo",
-  local: "Local de trabalho", area: "Área", situacao: "Situação"
+  local: "Local de trabalho", area: "Área", situacao: "Situação", numeroEquipamento: "Nº equipamento", numeroFrota: "Nº frota", empresa: "Empresa"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", company: "Todas", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -319,6 +319,7 @@ function filteredRows(module) {
   const query = slug(state.query);
   if (query) rows = rows.filter(row => slug(Object.values(row).join(" ")).includes(query));
   if (state.status !== "Todos") rows = rows.filter(row => normalizeStatus(row) === state.status);
+  if (module === "frotasBusca" && state.company !== "Todas") rows = rows.filter(row => String(row.empresa || "") === state.company);
   if (state.sortBy) rows = [...rows].sort((a,b) => String(a[state.sortBy] ?? "").localeCompare(String(b[state.sortBy] ?? ""), "pt-BR", { numeric:true }) * (state.sortDir === "desc" ? -1 : 1));
   return rows;
 }
@@ -348,6 +349,7 @@ function renderModule(module) {
       <div class="toolbar">
         <label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar neste módulo"></label>
         ${hasStatus ? `<label class="field-inline"><span>Situação</span><select data-status-filter>${["Todos", "Concluído", "Em andamento", "Pendente", "Não informado"].map(value => `<option ${state.status === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>` : ""}
+        ${module === "frotasBusca" ? `<label class="field-inline"><span>Empresa</span><select data-company-filter><option>Todas</option>${[...new Set((state.data.modules.frotasBusca||[]).map(row=>row.empresa).filter(Boolean))].sort().map(value=>`<option ${state.company===value?'selected':''}>${escapeHtml(value)}</option>`).join('')}</select></label>` : ""}
         <label class="field-inline compact-select"><span>Linhas</span><select data-page-size>${[10,25,50,100].map(value=>`<option ${state.pageSize===value?'selected':''}>${value}</option>`).join('')}</select></label><div class="spacer"></div>${hasStatus ? `<div class="view-toggle"><button class="${state.viewMode === "table" ? "active" : ""}" data-view="table" title="Tabela">▤</button><button class="${state.viewMode === "kanban" ? "active" : ""}" data-view="kanban" title="Kanban">▦</button></div>` : ""}<span class="badge">${health.completeness}% completo</span><span class="badge">${rows.length} registros</span>
       </div>
       ${hasStatus && state.viewMode === "kanban" ? renderKanban(module, rows) : `<div class="table-wrap"><table><thead><tr>${columns.map(column => `<th><button class="sort-button ${state.sortBy===column?'active':''}" data-sort="${column}">${LABELS[column] || column}${state.sortBy===column?` <span>${state.sortDir==='asc'?'↑':'↓'}</span>`:''}</button></th>`).join("")}<th></th></tr></thead>
@@ -545,6 +547,8 @@ function bindViewEvents() {
   if (localSearch) localSearch.addEventListener("input", event => { state.query = event.target.value; state.page = 1; render(); requestAnimationFrame(() => { const input = $("[data-local-search]"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); });
   const statusFilter = $("[data-status-filter]");
   if (statusFilter) statusFilter.addEventListener("change", event => { state.status = event.target.value; state.page = 1; render(); });
+  const companyFilter = $("[data-company-filter]");
+  if (companyFilter) companyFilter.addEventListener("change", event => { state.company = event.target.value; state.page = 1; render(); });
   $$('[data-page]').forEach(button => button.addEventListener("click", () => { state.page = Number(button.dataset.page); render(); }));
   $$('[data-view]').forEach(button => button.addEventListener("click", () => { state.viewMode = button.dataset.view; render(); }));
   $$('[data-document-filter]').forEach(button => button.addEventListener("click", () => { state.documentFilter=button.dataset.documentFilter; render(); }));
