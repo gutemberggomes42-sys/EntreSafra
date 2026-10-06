@@ -120,9 +120,13 @@ function nav() {
 }
 
 function navigate(route) {
+  const previousRoute=state.route;
   state.route = MODULES[route] ? route : "dashboard";
   state.page = 1; state.status = "Todos"; state.rawSheet = null; state.sortBy = ""; state.sortDir = "asc";
-  state.documentFilter = "Todos";
+  if (previousRoute !== state.route) {
+    state.documentFilter = "Todos";
+    if (["caminhoesInfo","tacografos"].includes(previousRoute) || ["caminhoesInfo","tacografos"].includes(state.route)) state.query = "";
+  }
   location.hash = state.route;
   nav(); render();
   $("#sidebar").classList.remove("open");
