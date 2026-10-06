@@ -52,6 +52,7 @@ const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
 const AUDIT_KEY = "entressafra-v1-audit";
 const TEAMS_KEY = "entressafra-v1-teams";
+const DELETED_TEAMS_KEY = "entressafra-v1-deleted-teams";
 const AXIAGRO_INSTALLATIONS_KEY = "entressafra-v1-axiagro-installations";
 const AXIAGRO_STOCK_MIGRATION_KEY = "entressafra-v1-axiagro-stock-migrated";
 const AXIAGRO_PHONE_SEED_KEY = "entressafra-v1-axiagro-phone-seeded";
@@ -65,7 +66,20 @@ const isBlank = (value) => value === "" || value === null || value === undefined
 function stored(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
-function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); window.FirebaseSync?.queue?.(); }
+function save(key, value) {
+  if (key === PATCH_KEY) {
+    let previous = {}; try { previous = JSON.parse(localStorage.getItem(key) || "{}"); } catch {}
+    const changedAt = new Date().toISOString();
+    Object.entries(value).forEach(([id, patch]) => {
+      const old = previous[id] || {}; const fieldTimes = { ...(old._syncFieldAt || {}) };
+      Object.keys(patch).filter(field => field !== "_syncFieldAt").forEach(field => {
+        if (JSON.stringify(patch[field]) !== JSON.stringify(old[field])) fieldTimes[field] = changedAt;
+      });
+      value[id] = { ...patch, _syncFieldAt: fieldTimes };
+    });
+  }
+  localStorage.setItem(key, JSON.stringify(value)); window.FirebaseSync?.queue?.();
+}
 
 function applyLocalChanges() {
   const patches = stored(PATCH_KEY, {});
@@ -685,7 +699,7 @@ function saveTeam(event) {
 function deleteTeam(teamId) {
   const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
   if (!confirm(`Apagar apenas a lista “${team.name}”? Nenhum cadastro de funcionário será excluído.`)) return;
-  save(TEAMS_KEY, teams.filter(item => item.id !== teamId)); state.selectedTeam = null;
+  const deletedTeams=stored(DELETED_TEAMS_KEY,[]); if(!deletedTeams.includes(teamId))deletedTeams.push(teamId); save(DELETED_TEAMS_KEY,deletedTeams); save(TEAMS_KEY, teams.filter(item => item.id !== teamId)); state.selectedTeam = null;
   audit("Exclusão", "funcionarios", { id: teamId, frota: team.name }, "Lista apagada; cadastros preservados"); toast("Lista apagada. Os funcionários continuam cadastrados."); render();
 }
 
@@ -723,7 +737,7 @@ function exportTeam(teamId) {
 
 function removeTeamMember(teamId, employeeId) {
   const teams = stored(TEAMS_KEY, []); const team = teams.find(item => item.id === teamId); if (!team) return;
-  const employee = findRecord("funcionarios", employeeId); team.members = (team.members || []).filter(id => id !== employeeId); save(TEAMS_KEY, teams);
+  const employee = findRecord("funcionarios", employeeId); team.members = (team.members || []).filter(id => id !== employeeId); team.updatedAt=new Date().toISOString(); save(TEAMS_KEY, teams);
   audit("Edição", "funcionarios", employee || {id:employeeId}, `Removido da equipe ${team.name}; cadastro preservado`); toast("Removido apenas desta lista. O cadastro foi preservado."); render();
 }
 

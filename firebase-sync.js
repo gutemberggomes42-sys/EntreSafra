@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-analytics.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -19,16 +19,25 @@ const KEYS = {
   deleted: "entressafra-v1-deleted",
   teams: "entressafra-v1-teams",
   installations: "entressafra-v1-axiagro-installations",
-  audit: "entressafra-v1-audit"
+  audit: "entressafra-v1-audit",
+  deletedTeams: "entressafra-v1-deleted-teams"
 };
-const CLOUD_STAMP = "entressafra-firebase-updated-at";
+const CLOUD_REVISION = "entressafra-firebase-revision";
+const CLIENT_ID = "entressafra-firebase-client-id";
 let timer = null;
 let pendingSync = false;
+let retryCount = 0;
 let applyingRemote = false;
 let workspaceRef = null;
 let auth = null;
 let unsubscribeSnapshot = null;
 let authStateResolved = false;
+
+function clientId() {
+  let id = localStorage.getItem(CLIENT_ID);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(CLIENT_ID, id); }
+  return id;
+}
 
 function setStatus(text, mode = "online") {
   const label = document.querySelector("#cloudStatusText");
@@ -57,8 +66,8 @@ function authMessage(error) {
 function readLocal() {
   const payload = {};
   Object.entries(KEYS).forEach(([field,key]) => {
-    try { payload[field] = JSON.parse(localStorage.getItem(key)) ?? (field === "patches" || field === "additions" ? {} : []); }
-    catch { payload[field] = field === "patches" || field === "additions" ? {} : []; }
+    try { payload[field] = JSON.parse(localStorage.getItem(key)) ?? (["patches", "additions"].includes(field) ? {} : []); }
+    catch { payload[field] = ["patches", "additions"].includes(field) ? {} : []; }
   });
   return payload;
 }
@@ -68,23 +77,78 @@ function applyRemote(data) {
   Object.entries(KEYS).forEach(([field,key]) => {
     if (data[field] !== undefined) localStorage.setItem(key, JSON.stringify(data[field]));
   });
-  localStorage.setItem(CLOUD_STAMP, String(data.updatedAtMs || Date.now()));
+  localStorage.setItem(CLOUD_REVISION, String(data.revision || 0));
   applyingRemote = false;
+}
+
+function mergeMap(remote = {}, local = {}) {
+  const result = { ...remote };
+  Object.entries(local).forEach(([id, value]) => {
+    const previous = result[id] || {}; const merged = { ...previous };
+    Object.entries(value || {}).forEach(([field, next]) => {
+      if (field === "_syncFieldAt") return;
+      const previousTime = Date.parse(previous._syncFieldAt?.[field] || "") || 0;
+      const nextTime = Date.parse(value._syncFieldAt?.[field] || "") || 0;
+      if (!(field in previous) || (nextTime > 0 && nextTime >= previousTime)) merged[field] = next;
+    });
+    merged._syncFieldAt = { ...(previous._syncFieldAt || {}), ...(value?._syncFieldAt || {}) };
+    result[id] = merged;
+  });
+  return result;
+}
+
+function mergeById(remote = [], local = [], deleted = new Set()) {
+  const result = new Map((remote || []).filter(item => item?.id && !deleted.has(item.id)).map(item => [item.id, item]));
+  (local || []).forEach(item => {
+    if (!item?.id || deleted.has(item.id)) return;
+    const previous = result.get(item.id);
+    if (!previous) result.set(item.id, item);
+    else {
+      const prevTime = Date.parse(previous.updatedAt || previous.createdAt || "") || 0;
+      const nextTime = Date.parse(item.updatedAt || item.createdAt || "") || 0;
+      result.set(item.id, nextTime >= prevTime ? { ...previous, ...item } : { ...item, ...previous });
+    }
+  });
+  return [...result.values()];
+}
+
+function mergeWorkspace(remote = {}, local = {}) {
+  const deleted = [...new Set([...(remote.deleted || []), ...(local.deleted || [])])];
+  const deletedTeams = [...new Set([...(remote.deletedTeams || []), ...(local.deletedTeams || [])])];
+  return {
+    patches: mergeMap(remote.patches, local.patches),
+    additions: Object.fromEntries([...new Set([...Object.keys(remote.additions || {}), ...Object.keys(local.additions || {})])].map(module => [module, mergeById(remote.additions?.[module], local.additions?.[module], new Set(deleted))])),
+    deleted,
+    deletedTeams,
+    teams: mergeById(remote.teams, local.teams, new Set(deletedTeams)),
+    installations: mergeById(remote.installations, local.installations),
+    audit: mergeById(remote.audit, local.audit).sort((a,b) => (Date.parse(b.at || b.createdAt || "") || 0) - (Date.parse(a.at || a.createdAt || "") || 0)).slice(0,300)
+  };
 }
 
 async function pushNow() {
   if (applyingRemote) return;
   if (!workspaceRef) { pendingSync = true; return; }
-  const updatedAtMs = Date.now();
   setStatus("Sincronizando com Firebase...", "syncing");
   try {
-    await setDoc(workspaceRef, { ...readLocal(), updatedAtMs, updatedBy: navigator.userAgent.slice(0,120), schemaVersion: 2 });
+    const local = readLocal();
+    let committed;
+    await runTransaction(workspaceRef.firestore, async transaction => {
+      const snapshot = await transaction.get(workspaceRef);
+      const remote = snapshot.exists() ? snapshot.data() : {};
+      const merged = mergeWorkspace(remote, local);
+      committed = { ...merged, revision: (Number(remote.revision) || 0) + 1, updatedAt: new Date().toISOString(), updatedBy: window.FirebaseSync?.user?.uid || clientId(), schemaVersion: 3 };
+      transaction.set(workspaceRef, committed);
+    });
     pendingSync = false;
-    localStorage.setItem(CLOUD_STAMP, String(updatedAtMs));
+    retryCount = 0;
+    localStorage.setItem(CLOUD_REVISION, String(committed.revision));
     setStatus("Firebase sincronizado", "online");
   } catch (error) {
     console.warn("Firebase: não foi possível salvar.", error.code || error.message);
-    setStatus("Offline · alterações preservadas", "offline");
+    setStatus("Falha ao sincronizar · tentando novamente", "offline");
+    retryCount += 1;
+    clearTimeout(timer); timer = setTimeout(pushNow, Math.min(60000, 1500 * (2 ** Math.min(retryCount, 6))));
   }
 }
 
@@ -102,8 +166,8 @@ async function startFirestore(app, user) {
     const snapshot = await Promise.race([getDoc(workspaceRef), new Promise((_,reject)=>setTimeout(()=>reject(new Error("Tempo limite de conexão")),8000))]);
     if (snapshot.exists()) {
       const remote = snapshot.data();
-      const localStamp = Number(localStorage.getItem(CLOUD_STAMP) || 0);
-      if ((remote.updatedAtMs || 0) > localStamp) applyRemote(remote);
+      const localRevision = Number(localStorage.getItem(CLOUD_REVISION) ?? -1);
+      if ((remote.revision || 0) > localRevision) applyRemote(remote);
     } else {
       await pushNow();
     }
@@ -112,8 +176,8 @@ async function startFirestore(app, user) {
     unsubscribeSnapshot = onSnapshot(workspaceRef, snap => {
       if (!snap.exists()) return;
       const remote = snap.data();
-      const localStamp = Number(localStorage.getItem(CLOUD_STAMP) || 0);
-      if ((remote.updatedAtMs || 0) > localStamp) {
+      const localRevision = Number(localStorage.getItem(CLOUD_REVISION) ?? -1);
+      if ((remote.revision || 0) > localRevision) {
         applyRemote(remote);
         setStatus("Dados atualizados pela nuvem", "online");
         setTimeout(() => location.reload(), 400);
