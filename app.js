@@ -291,15 +291,34 @@ function renderDeadlines() {
     </div></section>`;
 }
 
-function audit(action, module, record, details = "") {
+function audit(action, module, record, details = "", changes = []) {
   const log = stored(AUDIT_KEY, []);
-  log.unshift({ id: Date.now(), action, module, record: record?.frota || record?.placa || record?.id || "Registro", details, at: new Date().toISOString() });
+  const user = window.FirebaseSync?.user;
+  log.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, entityId: record?.id || "", action, module, record: record?.frota || record?.placa || record?.nome || record?.equipamento || record?.id || "Registro", details, changes, user: user?.email || "Usuário autenticado", userId: user?.uid || "", at: new Date().toISOString() });
   save(AUDIT_KEY, log.slice(0, 300));
 }
 
+function notificationStorageKey(){return `entressafra-v1-notifications-seen-${window.FirebaseSync?.user?.uid||"guest"}`;}
+function readSeenNotifications(){try{return new Set(JSON.parse(localStorage.getItem(notificationStorageKey())||"[]").map(String))}catch{return new Set()}}
+function saveSeenNotifications(seen){localStorage.setItem(notificationStorageKey(),JSON.stringify([...seen].slice(-500)));}
+function relevantNotifications(){const userId=window.FirebaseSync?.user?.uid;return stored(AUDIT_KEY,[]).filter(item=>item.userId&&item.userId!==userId).sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0));}
+function initializeNotificationCenter(){
+  const key=notificationStorageKey();
+  let pending=[];try{pending=JSON.parse(localStorage.getItem("entressafra-v1-pending-notifications")||"[]")}catch{}
+  if(localStorage.getItem(key)===null){const pendingIds=new Set(pending.map(item=>String(item.id))); const seen=relevantNotifications().filter(item=>!pendingIds.has(String(item.id))).map(item=>String(item.id)); saveSeenNotifications(new Set(seen));}
+  localStorage.removeItem("entressafra-v1-pending-notifications");
+}
+function renderNotificationCenter(){
+  const button=$("#notificationButton"), popover=$("#notificationPopover"); if(!button||!popover)return;
+  if(!window.FirebaseSync?.user){$("#notificationWrap").classList.add("hidden");return;} $("#notificationWrap").classList.remove("hidden");
+  const items=relevantNotifications(); const seen=readSeenNotifications(); const unread=items.filter(item=>!seen.has(String(item.id))); const count=$("#notificationCount"); count.textContent=unread.length>99?"99+":String(unread.length); count.classList.toggle("hidden",!unread.length); button.setAttribute("aria-label",unread.length?`${unread.length} notificações não lidas`:"Notificações");
+  popover.innerHTML=`<div class="notification-head"><div><strong>Notificações</strong><small>${unread.length?`${unread.length} não lida${unread.length===1?'':'s'}`:'Tudo em dia'}</small></div><button type="button" data-notifications-read-all ${unread.length?'':'disabled'}>Marcar lidas</button></div>${items.length?`<div class="notification-list">${items.slice(0,20).map(item=>`<button class="notification-item ${seen.has(String(item.id))?'':'unread'}" type="button" data-notification-id="${escapeHtml(item.id)}"><span class="notification-dot"></span><span class="notification-content"><strong>${escapeHtml(item.record||'Registro')} · ${escapeHtml(item.action)}</strong><small>${escapeHtml(item.user||'Usuário não identificado')} · ${escapeHtml(MODULES[item.module]?.label||item.module||'Sistema')}</small><span>${escapeHtml(item.details||'Alteração registrada')}</span><time>${new Date(item.at).toLocaleString('pt-BR')}</time></span></button>`).join('')}</div>`:`<div class="notification-empty"><strong>Sem alterações recentes</strong><span>As mudanças dos outros usuários aparecerão aqui.</span></div>`}<button class="notification-history" type="button" data-notifications-history>Abrir histórico de alterações</button>`;
+}
+function markAllNotificationsRead(){const seen=readSeenNotifications();relevantNotifications().forEach(item=>seen.add(String(item.id)));saveSeenNotifications(seen);renderNotificationCenter();}
+
 function renderActivity() {
   const log = stored(AUDIT_KEY, []);
-  return `${pageHeading(MODULES.activity.title, MODULES.activity.description, false)}<section class="panel"><div class="panel-header"><div><h3>Atividade local</h3><p>As ações ficam registradas somente neste navegador</p></div><span class="badge">${log.length} eventos</span></div><div class="activity-list">${log.length ? log.map(item => `<article class="activity-item"><span class="activity-icon ${slug(item.action)}">${item.action === "Exclusão" ? "−" : item.action === "Inclusão" ? "+" : "↻"}</span><div><strong>${escapeHtml(item.action)} · ${escapeHtml(item.record)}</strong><p>${escapeHtml(MODULES[item.module]?.label || item.module)}${item.details ? ` · ${escapeHtml(item.details)}` : ""}</p></div><time>${new Date(item.at).toLocaleString("pt-BR")}</time></article>`).join("") : `<div class="empty-state"><strong>Nenhuma alteração registrada</strong>As próximas inclusões, edições e exclusões aparecerão aqui.</div>`}</div></section>`;
+  return `${pageHeading(MODULES.activity.title, MODULES.activity.description, false)}<section class="panel"><div class="panel-header"><div><h3>Alterações do sistema</h3><p>Usuário responsável, módulo e detalhes de cada alteração</p></div><span class="badge">${log.length} eventos</span></div><div class="activity-list">${log.length ? log.map(item => `<article class="activity-item"><span class="activity-icon ${slug(item.action)}">${item.action === "Exclusão" ? "−" : item.action === "Inclusão" ? "+" : "↻"}</span><div><strong>${escapeHtml(item.action)} · ${escapeHtml(item.record)}</strong><p>${escapeHtml(MODULES[item.module]?.label || item.module)}${item.details ? ` · ${escapeHtml(item.details)}` : ""}</p><small class="activity-actor">Por ${escapeHtml(item.user || "Usuário não identificado")}</small>${item.changes?.length ? `<ul class="activity-changes">${item.changes.map(change=>`<li><b>${escapeHtml(LABELS[change.field]||change.field)}:</b> ${escapeHtml(change.before||"(vazio)")} → ${escapeHtml(change.after||"(vazio)")}</li>`).join("")}</ul>` : ""}</div><time>${new Date(item.at).toLocaleString("pt-BR")}</time></article>`).join("") : `<div class="empty-state"><strong>Nenhuma alteração registrada</strong>As próximas alterações aparecerão aqui.</div>`}</div></section>`;
 }
 
 function moduleHealth(module) {
@@ -542,6 +561,7 @@ function render() {
   const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
+  renderNotificationCenter();
 }
 
 function bindViewEvents() {
@@ -794,11 +814,12 @@ function persistForm(event) {
   const values = Object.fromEntries(new FormData(event.currentTarget).entries());
   if ("status" in values) values.statusNormalizado = normalizeStatus(values);
   if (id) {
+    const record=findRecord(module,id); const changes=Object.entries(values).filter(([field,next])=>String(record?.[field]??"")!==String(next??"")).map(([field,next])=>({field,before:String(record?.[field]??""),after:String(next??"")}));
     const patches = stored(PATCH_KEY, {}); patches[id] = { ...(patches[id] || {}), ...values }; save(PATCH_KEY, patches);
-    Object.assign(findRecord(module, id), values); audit("Edição", module, findRecord(module, id), "Campos atualizados"); toast("Registro atualizado com sucesso.");
+    Object.assign(record, values); audit("Edição", module, record, changes.length?`Campos alterados: ${changes.map(change=>LABELS[change.field]||change.field).join(", ")}`:"Nenhum campo alterado", changes); toast("Registro atualizado com sucesso.");
   } else {
     const additions = stored(NEW_KEY, {}); const record = { ...values, id: `${module}-novo-${Date.now()}`, _sourceRow: "Novo" };
-    (additions[module] ||= []).push(record); save(NEW_KEY, additions); state.data.modules[module].push(record); audit("Inclusão", module, record, "Novo registro criado"); toast("Novo registro adicionado.");
+    (additions[module] ||= []).push(record); save(NEW_KEY, additions); state.data.modules[module].push(record); audit("Inclusão", module, record, `Cadastro criado com ${Object.keys(values).filter(field=>values[field]).length} campos preenchidos`, Object.entries(values).filter(([,value])=>value).map(([field,value])=>({field,before:"",after:String(value)}))); toast("Novo registro adicionado.");
   }
   $("#recordDialog").close(); render();
 }
@@ -826,7 +847,7 @@ function backup() {
   const payload = { version: 3, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), axiagroInstallations: stored(AXIAGRO_INSTALLATIONS_KEY, []), audit: stored(AUDIT_KEY, []) };
   download(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `backup-entressafra-${new Date().toISOString().slice(0, 10)}.json`); toast("Backup dos dados gerado.");
 }
-function toast(message) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), 3000); }
+function toast(message, duration = 3000) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), duration); }
 
 function bindGlobalEvents() {
   $("#mainNav").addEventListener("click", event => { const button = event.target.closest("[data-route]"); if (button) navigate(button.dataset.route); });
@@ -836,6 +857,21 @@ function bindGlobalEvents() {
     const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next; localStorage.setItem("entressafra-theme", next); toast(`Tema ${next === "dark" ? "escuro" : "claro"} ativado.`);
   });
+  $("#notificationButton").addEventListener("click", () => {
+    const popover=$("#notificationPopover"); const opening=popover.classList.contains("hidden"); popover.classList.toggle("hidden",!opening); $("#notificationButton").setAttribute("aria-expanded",String(opening));
+    if(opening)markAllNotificationsRead();
+  });
+  $("#notificationPopover").addEventListener("click", event => {
+    if(event.target.closest("[data-notifications-read-all]")){markAllNotificationsRead();return;}
+    if(event.target.closest("[data-notifications-history]")){ $("#notificationPopover").classList.add("hidden"); $("#notificationButton").setAttribute("aria-expanded","false"); navigate("activity"); return; }
+    const itemButton=event.target.closest("[data-notification-id]"); if(!itemButton)return;
+    const item=relevantNotifications().find(entry=>String(entry.id)===itemButton.dataset.notificationId); if(!item)return;
+    const seen=readSeenNotifications();seen.add(String(item.id));saveSeenNotifications(seen);$("#notificationPopover").classList.add("hidden");$("#notificationButton").setAttribute("aria-expanded","false");
+    const route=MODULES[item.module]?item.module:item.module?.startsWith("axiagro")?"axiagro":"activity"; navigate(route);
+    if(item.entityId&&MODULES[item.module]?.columns)setTimeout(()=>{if(findRecord(item.module,item.entityId))openDetails(item.module,item.entityId);},80);
+  });
+  document.addEventListener("click",event=>{if(!event.target.closest("#notificationWrap")){ $("#notificationPopover").classList.add("hidden");$("#notificationButton").setAttribute("aria-expanded","false"); }});
+  window.addEventListener("storage",event=>{if(event.key===AUDIT_KEY||event.key?.includes("notifications-seen"))renderNotificationCenter();});
   $("#recordForm").addEventListener("submit", persistForm);
   $("#teamForm").addEventListener("submit", saveTeam);
   $("#installationForm").addEventListener("submit", saveInstallation);
@@ -875,7 +911,7 @@ async function init() {
     ensureAxiagroPhoneStock();
     migrateAxiagroControlsToStock();
     state.route = MODULES[location.hash.slice(1)] ? location.hash.slice(1) : "dashboard";
-    bindGlobalEvents(); nav(); render(); window.__entressafraAppReady = true;
+    initializeNotificationCenter(); bindGlobalEvents(); nav(); render(); window.__entressafraAppReady = true;
   } catch (error) {
     $("#app").innerHTML = `<div class="empty-state"><strong>Não foi possível abrir os dados</strong>Inicie o sistema pelo servidor local para carregar a base da planilha.<br><small>${escapeHtml(error.message)}</small></div>`;
   }

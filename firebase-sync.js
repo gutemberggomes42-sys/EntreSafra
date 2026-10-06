@@ -24,6 +24,7 @@ const KEYS = {
 };
 const CLOUD_REVISION = "entressafra-firebase-revision";
 const CLIENT_ID = "entressafra-firebase-client-id";
+const PENDING_NOTIFICATIONS = "entressafra-v1-pending-notifications";
 let timer = null;
 let pendingSync = false;
 let retryCount = 0;
@@ -178,6 +179,9 @@ async function startFirestore(app, user) {
       const remote = snap.data();
       const localRevision = Number(localStorage.getItem(CLOUD_REVISION) ?? -1);
       if ((remote.revision || 0) > localRevision) {
+        const knownIds=new Set((readLocal().audit||[]).map(entry=>String(entry.id))); const currentUserId=window.FirebaseSync?.user?.uid;
+        const incoming=(remote.audit||[]).filter(entry=>!knownIds.has(String(entry.id))&&entry.userId&&entry.userId!==currentUserId);
+        if(incoming.length){let pending=[];try{pending=JSON.parse(localStorage.getItem(PENDING_NOTIFICATIONS)||"[]")}catch{};const ids=new Set(pending.map(entry=>String(entry.id)));localStorage.setItem(PENDING_NOTIFICATIONS,JSON.stringify([...incoming.filter(entry=>!ids.has(String(entry.id))),...pending].slice(0,20)));}
         applyRemote(remote);
         setStatus("Dados atualizados pela nuvem", "online");
         setTimeout(() => location.reload(), 400);

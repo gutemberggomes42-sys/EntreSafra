@@ -38,6 +38,7 @@
             <kbd>Ctrl K</kbd>
           </label>
           <button class="icon-button theme-button" id="themeButton" aria-label="Alternar tema" title="Alternar tema">◐</button>
+          <div class="notification-wrap" id="notificationWrap"><button class="icon-button notification-button" id="notificationButton" type="button" aria-label="Notificações" aria-expanded="false" title="Notificações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i id="notificationCount" class="notification-count hidden">0</i></button><section class="notification-popover hidden" id="notificationPopover" aria-label="Notificações recentes"></section></div>
           <button class="secondary-button auth-button" id="authButton" type="button">Entrar</button>
           <button class="primary-button" id="newRecordButton"><span>＋</span>Novo registro</button>
         </div>
@@ -130,8 +131,8 @@
   </dialog>
 
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve); window.firebaseAuthReady = new Promise(resolve => window.__resolveFirebaseAuth = resolve);</script>
-  <script type="module" src="firebase-sync.js?v=20261006-1"></script>
+  <script type="module" src="firebase-sync.js?v=20261006-3"></script>
   <script src="data.js?v=20261005-2" defer></script>
-  <script src="app.js?v=20261006-1" defer></script>
+  <script src="app.js?v=20261006-3" defer></script>
 </body>
 </html>
