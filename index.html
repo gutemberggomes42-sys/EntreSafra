@@ -130,6 +130,23 @@
     </form>
   </dialog>
 
+  <dialog id="gpsEquipmentDialog" class="dialog">
+    <form method="dialog" id="gpsEquipmentForm">
+      <div class="dialog-header"><div><span class="eyebrow">CONTROLES · GPS</span><h2 id="gpsEquipmentDialogTitle">Cadastrar equipamento GPS</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><div class="form-grid">
+        <div class="form-field"><label for="gpsEquipmentType">Equipamento</label><select id="gpsEquipmentType" name="tipoEquipamento" required><option>Antena GPS</option><option>Capacete</option><option>Monitor</option><option>Volante elétrico</option></select></div>
+        <div class="form-field"><label for="gpsEquipmentIdentifier">Identificação GPS</label><input id="gpsEquipmentIdentifier" name="identificadorGps" required placeholder="Número ou código único do GPS"></div>
+        <div class="form-field"><label for="gpsEquipmentModel">Modelo</label><input id="gpsEquipmentModel" name="modelo" placeholder="Modelo do equipamento"></div>
+        <div class="form-field"><label for="gpsFleet">Frota</label><input id="gpsFleet" name="frota" list="gpsFleetOptions" required placeholder="Pesquise a frota cadastrada"><datalist id="gpsFleetOptions"></datalist><small class="field-help">Selecione a frota na Busca Frota.</small></div>
+        <div class="form-field"><label for="gpsWorkLocation">Local de trabalho</label><input id="gpsWorkLocation" name="localTrabalho" required placeholder="Ex.: Frente 4001, Fazenda ou Base"></div>
+        <div class="form-field"><label for="gpsEquipmentStatus">Situação</label><select id="gpsEquipmentStatus" name="situacaoGps"><option>Instalado</option><option>Em estoque</option><option>Em manutenção</option><option>Retirado</option></select></div>
+        <div class="form-field"><label for="gpsInstallDate">Data da instalação</label><input id="gpsInstallDate" name="dataInstalacao" type="date"></div>
+        <div class="form-field wide"><label for="gpsEquipmentNotes">Observação</label><textarea id="gpsEquipmentNotes" name="observacao" placeholder="Informações adicionais do equipamento"></textarea></div>
+      </div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Salvar equipamento</button></div>
+    </form>
+  </dialog>
+
   <dialog id="tacographDialog" class="dialog">
     <form method="dialog" id="tacographForm">
       <div class="dialog-header"><div><span class="eyebrow">DOCUMENTAÇÃO · TACÓGRAFO</span><h2>Atualizar aferição</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
@@ -144,8 +161,8 @@
   </dialog>
 
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve); window.firebaseAuthReady = new Promise(resolve => window.__resolveFirebaseAuth = resolve);</script>
-  <script type="module" src="firebase-sync.js?v=20261006-3"></script>
+  <script type="module" src="firebase-sync.js?v=20261006-4"></script>
   <script src="data.js?v=20261005-2" defer></script>
-  <script src="app.js?v=20261006-3" defer></script>
+  <script src="app.js?v=20261006-4" defer></script>
 </body>
 </html>

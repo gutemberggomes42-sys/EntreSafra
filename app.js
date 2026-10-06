@@ -17,6 +17,7 @@ const MODULES = {
   carretasInfo: { label: "Documentos de carretas", icon: "▥", group: "Documentação", title: "Documentação das carretas", description: "Placas, lacres, CRLV, ANTT, faixas e itens de segurança.", key: "frota", columns: ["frota", "placa", "grupo", "situacaoPlaca", "lacre", "possuiCrlv", "antt", "faixaParachoque", "faixaRefletiva", "observacao"] },
   radios: { label: "Controle de rádios", icon: "⌁", group: "Controles", title: "Controle de rádios", description: "Identificação, frota, setor, disponibilidade e tipo de rádio.", key: "frota", columns: ["frota", "identificador", "descricao", "setor", "possuiRadio", "carregador", "tipo"] },
   axiagro: { label: "AXIAGRO", icon: "◉", group: "Controles", title: "Controle AXIAGRO", description: "Gestão dos celulares, suportes, lacres, fusíveis, endereços MAC e estoque de equipamentos AXIAGRO." },
+  gpsMonitoramento: { label: "Acompanhamento de GPS", icon: "⌖", group: "Controles", title: "Acompanhamento de GPS", description: "Acompanhe antenas, capacetes, monitores e volantes elétricos instalados nas frotas e seus locais de trabalho.", columns: ["tipoEquipamento", "identificadorGps", "frota", "localTrabalho", "situacaoGps", "dataInstalacao", "observacao"] },
   axiagroControle: { label: "AXIAGRO · Celulares", title: "Controle de celulares AXIAGRO", key: "frota", columns: ["frota", "frente", "statusCelular", "statusSuporte", "numeroLacre", "fusivel", "statusAparelho", "mac", "observacao"] },
   axiagroEstoque: { label: "AXIAGRO · Estoque", title: "Estoque AXIAGRO", key: "equipamento", columns: ["equipamento", "modelo", "quantidade"] },
   frotasBusca: { label: "Busca Frota · Usina", icon: "▦", group: "Cadastros", title: "Frotas cadastradas da usina", description: "Base oficial da Busca Frota para seleção segura de equipamentos.", key: "frota", columns: ["numeroEquipamento", "numeroFrota", "equipamento", "modelo", "ano", "placa", "chassi", "situacao", "grupo", "departamento", "empresa"] },
@@ -45,9 +46,10 @@ const LABELS = {
   statusAparelho: "Status do aparelho", mac: "MAC", quantidade: "Quantidade"
   ,empresa: "Empresa", cadastro: "Cadastro", nome: "Nome do funcionário", admissao: "Admissão", cargo: "Cargo",
   local: "Local de trabalho", area: "Área", situacao: "Situação", numeroEquipamento: "Nº equipamento", numeroFrota: "Nº frota", empresa: "Empresa"
+  ,tipoEquipamento: "Equipamento GPS", identificadorGps: "Identificação GPS", localTrabalho: "Local de trabalho", situacaoGps: "Situação", dataInstalacao: "Data da instalação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", company: "Todas", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", company: "Todas", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas", gpsTypeFilter: "Todos" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -57,6 +59,7 @@ const DELETED_TEAMS_KEY = "entressafra-v1-deleted-teams";
 const AXIAGRO_INSTALLATIONS_KEY = "entressafra-v1-axiagro-installations";
 const AXIAGRO_STOCK_MIGRATION_KEY = "entressafra-v1-axiagro-stock-migrated";
 const AXIAGRO_PHONE_SEED_KEY = "entressafra-v1-axiagro-phone-seeded";
+const GPS_EQUIPMENT_KEY = "entressafra-v1-gps-equipments";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -125,7 +128,7 @@ function navigate(route) {
   state.page = 1; state.status = "Todos"; state.rawSheet = null; state.sortBy = ""; state.sortDir = "asc";
   if (previousRoute !== state.route) {
     state.documentFilter = "Todos";
-    if (["caminhoesInfo","tacografos"].includes(previousRoute) || ["caminhoesInfo","tacografos"].includes(state.route)) state.query = "";
+    if (["caminhoesInfo","tacografos","gpsMonitoramento"].includes(previousRoute) || ["caminhoesInfo","tacografos","gpsMonitoramento"].includes(state.route)) state.query = "";
   }
   location.hash = state.route;
   nav(); render();
@@ -444,6 +447,18 @@ function renderTacographs() {
   return `${pageHeading(MODULES.tacografos.title,MODULES.tacografos.description)}<div class="metrics"><article class="metric"><span class="label">Veículos monitorados</span><strong>${source.length}</strong><small>${withStatus} com situação informada · ${withoutStatus} sem cadastro</small></article><article class="metric danger"><span class="label">Vencidos</span><strong>${expired}</strong><small>precisam de aferição</small></article><article class="metric warning"><span class="label">Vencem em até 90 dias</span><strong>${upcoming}</strong><small>programar atendimento</small></article><article class="metric"><span class="label">Sem data de vencimento</span><strong>${review}</strong><small>confirmar cadastro</small></article></div><section class="panel truck-documents"><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, placa ou situação"></label><div class="document-filters">${["Todos","Vencidos","90 dias","Revisar","Válidos"].map(value=>`<button class="filter-chip ${state.documentFilter===value?'active':''}" data-document-filter="${value}">${value}</button>`).join('')}</div><span class="spacer"></span><span class="badge">${rows.length} veículos</span></div><div class="table-wrap"><table><thead><tr><th>Frota</th><th>Placa</th><th>Operação</th><th>Situação do tacógrafo</th><th>Data da aferição</th><th>Vencimento</th><th>Situação do prazo</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${escapeHtml(row.frota||'—')}</strong></td><td>${escapeHtml(row.placa||'—')}</td><td>${escapeHtml(row.operacao||'—')}</td><td>${isBlank(row.tacografo)?badge('Não cadastrado'):badge(row.tacografo)}</td><td>${formatValue(row.dataAfericao,'dataAfericao')}</td><td>${formatValue(row.vencimento,'vencimento')}</td><td>${badge(row._docStatus.label)}</td><td><button class="secondary-button" data-tacograph-edit="${escapeHtml(row.id)}">Editar tacógrafo</button></td></tr>`).join('')}</tbody></table></div>${!rows.length?`<div class="empty-state"><strong>Nenhum veículo encontrado</strong>Revise os filtros ou a pesquisa.</div>`:''}</section>`;
 }
 
+function renderGpsMonitoring() {
+  const all=stored(GPS_EQUIPMENT_KEY,[]);
+  const query=slug(state.query);
+  const types=["Antena GPS","Capacete","Monitor","Volante elétrico"];
+  const rows=all.filter(item=>(state.gpsTypeFilter==="Todos"||item.tipoEquipamento===state.gpsTypeFilter)&&(!query||slug(`${item.identificadorGps} ${item.tipoEquipamento} ${item.frota} ${item.localTrabalho} ${item.modelo}`).includes(query)))
+    .sort((a,b)=>String(a.frota).localeCompare(String(b.frota),"pt-BR",{numeric:true})||String(a.tipoEquipamento).localeCompare(String(b.tipoEquipamento),"pt-BR"));
+  const installed=all.filter(item=>item.situacaoGps==="Instalado").length;
+  const inMaintenance=all.filter(item=>item.situacaoGps==="Em manutenção").length;
+  const fleetCount=new Set(all.filter(item=>item.frota).map(item=>String(item.frota))).size;
+  return `${pageHeading(MODULES.gpsMonitoramento.title,MODULES.gpsMonitoramento.description)}<div class="metrics"><article class="metric"><span class="label">Equipamentos cadastrados</span><strong>${all.length}</strong><small>identificadores GPS únicos</small></article><article class="metric"><span class="label">Instalados</span><strong>${installed}</strong><small>em ${fleetCount} frotas</small></article><article class="metric warning"><span class="label">Em manutenção</span><strong>${inMaintenance}</strong><small>aguardando retorno à operação</small></article><article class="metric"><span class="label">Tipos monitorados</span><strong>${new Set(all.map(item=>item.tipoEquipamento).filter(Boolean)).size}</strong><small>antena, capacete, monitor e volante</small></article></div><section class="panel"><div class="panel-header"><div><h3>Equipamentos e localização</h3><p>Um cadastro para cada identificador de GPS, associado à frota e ao local de trabalho.</p></div><button class="primary-button" data-gps-new>＋ Cadastrar equipamento</button></div><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar ID, frota ou local"></label><div class="document-filters">${["Todos",...types].map(value=>`<button class="filter-chip ${state.gpsTypeFilter===value?'active':''}" data-gps-type="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div><span class="spacer"></span><span class="badge">${rows.length} de ${all.length} equipamentos</span></div><div class="table-wrap"><table><thead><tr><th>Equipamento</th><th>Identificação GPS</th><th>Frota</th><th>Local de trabalho</th><th>Situação</th><th>Instalado em</th><th>Observação</th><th></th></tr></thead><tbody>${rows.map(item=>`<tr><td><strong>${escapeHtml(item.tipoEquipamento||"—")}</strong>${item.modelo?`<small class="table-subline">${escapeHtml(item.modelo)}</small>`:""}</td><td><span class="asset-identifier"><small>ID GPS</small>${escapeHtml(item.identificadorGps||"—")}</span></td><td>${escapeHtml(item.frota||"—")}</td><td>${escapeHtml(item.localTrabalho||"—")}</td><td>${badge(item.situacaoGps||"Instalado")}</td><td>${formatValue(item.dataInstalacao,"dataInstalacao")}</td><td>${escapeHtml(item.observacao||"—")}</td><td><button class="row-action" data-gps-edit="${escapeHtml(item.id)}" title="Editar equipamento">✎</button></td></tr>`).join("")}</tbody></table></div>${!rows.length?`<div class="empty-state"><strong>${all.length?"Nenhum equipamento encontrado":"Nenhum GPS cadastrado ainda"}</strong>${all.length?"Ajuste a busca ou o filtro de equipamento.":"Cadastre antenas, capacetes, monitores e volantes elétricos com seus identificadores."}</div>`:""}</section>`;
+}
+
 function renderAxiagroInstallations(stock) {
   const allInstallations = stored(AXIAGRO_INSTALLATIONS_KEY, []);
   const installations = allInstallations;
@@ -576,8 +591,8 @@ function renderRaw() {
 
 function render() {
   $("#breadcrumb").textContent = MODULES[state.route].label;
-  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "tacografos", "frotasBusca", "activity", "raw"].includes(state.route));
-  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, tacografos: renderTacographs, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
+  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "tacografos", "gpsMonitoramento", "frotasBusca", "activity", "raw"].includes(state.route));
+  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, tacografos: renderTacographs, gpsMonitoramento: renderGpsMonitoring, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
   renderNotificationCenter();
@@ -597,6 +612,9 @@ function bindViewEvents() {
   }));
   $$('[data-edit]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [module, id] = button.dataset.edit.split("|"); openForm(module, id); }));
   $$('[data-tacograph-edit]').forEach(button => button.addEventListener("click", () => openTacographDialog(button.dataset.tacographEdit)));
+  $$("[data-gps-new]").forEach(button=>button.addEventListener("click",()=>openGpsDialog()));
+  $$("[data-gps-edit]").forEach(button=>button.addEventListener("click",()=>openGpsDialog(button.dataset.gpsEdit)));
+  $$('[data-gps-type]').forEach(button=>button.addEventListener("click",()=>{state.gpsTypeFilter=button.dataset.gpsType;render();}));
   const localSearch = $("[data-local-search]");
   if (localSearch) localSearch.addEventListener("input", event => { state.query = event.target.value; state.page = 1; render(); requestAnimationFrame(() => { const input = $("[data-local-search]"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); });
   const statusFilter = $("[data-status-filter]");
@@ -655,6 +673,39 @@ function saveInstallation(event){
   if(id){const item=installations.find(entry=>entry.id===id);if(item)Object.assign(item,values,{updatedAt:new Date().toISOString()});}
   else {const item={id:`installation-${Date.now()}`,...values,items:[],createdAt:new Date().toISOString()};installations.push(item);state.selectedAxiagroInstallation=item.id;}
   save(AXIAGRO_INSTALLATIONS_KEY,installations); audit(id?"Edição":"Inclusão","axiagroControle",{id:id||state.selectedAxiagroInstallation,frota:values.fleet},"Equipamento AXIAGRO"); $("#installationDialog").close(); toast("Equipamento AXIAGRO salvo."); render();
+}
+
+function openGpsDialog(id=null){
+  const records=stored(GPS_EQUIPMENT_KEY,[]); const record=records.find(item=>item.id===id)||{}; const form=$("#gpsEquipmentForm");
+  form.reset(); form.dataset.gpsId=id||"";
+  const fleets=state.data.modules.frotasBusca||[]; const list=$("#gpsFleetOptions");
+  list.innerHTML=fleets.map(item=>`<option value="${escapeHtml(item.frota)}">${escapeHtml(`${item.equipamento||"Equipamento"} · ${item.empresa||""} · ${item.placa||item.chassi||""}`)}</option>`).join("");
+  $("#gpsEquipmentType").value=record.tipoEquipamento||"Antena GPS";
+  $("#gpsEquipmentIdentifier").value=record.identificadorGps||"";
+  $("#gpsEquipmentModel").value=record.modelo||"";
+  $("#gpsFleet").value=record.frota||"";
+  $("#gpsWorkLocation").value=record.localTrabalho||"";
+  $("#gpsEquipmentStatus").value=record.situacaoGps||"Instalado";
+  $("#gpsInstallDate").value=record.dataInstalacao?String(record.dataInstalacao).slice(0,10):"";
+  $("#gpsEquipmentNotes").value=record.observacao||"";
+  $("#gpsEquipmentDialogTitle").textContent=id?"Editar equipamento GPS":"Cadastrar equipamento GPS";
+  $("#gpsEquipmentDialog").showModal();
+}
+
+function saveGpsEquipment(event){
+  event.preventDefault();
+  const form=event.currentTarget; const id=form.dataset.gpsId||""; const values=Object.fromEntries(new FormData(form).entries());
+  values.frota=values.frota.trim(); values.identificadorGps=values.identificadorGps.trim(); values.localTrabalho=values.localTrabalho.trim();
+  const records=stored(GPS_EQUIPMENT_KEY,[]);
+  const duplicate=records.find(item=>slug(item.identificadorGps)===slug(values.identificadorGps)&&item.id!==id);
+  if(duplicate)return toast("Esse identificador GPS já está cadastrado. Confira o número antes de salvar.");
+  const fleetList=state.data.modules.frotasBusca||[];
+  if(fleetList.length&&!fleetList.some(item=>String(item.frota).trim()===values.frota))return toast("Selecione uma frota existente na Busca Frota.");
+  const now=new Date().toISOString();
+  let record;
+  if(id){record=records.find(item=>item.id===id);if(!record)return toast("O cadastro GPS não foi encontrado.");const changes=Object.entries(values).filter(([field,next])=>String(record[field]??"")!==String(next??"")).map(([field,next])=>({field,before:String(record[field]??""),after:String(next??"")}));Object.assign(record,values,{updatedAt:now});audit("Edição","gpsMonitoramento",record,`Equipamento ${record.tipoEquipamento} · ID ${record.identificadorGps}`,changes);}
+  else{record={id:`gps-${crypto.randomUUID()}`,...values,createdAt:now,updatedAt:now};records.push(record);audit("Inclusão","gpsMonitoramento",record,`Equipamento ${record.tipoEquipamento} · ID ${record.identificadorGps}`,Object.entries(values).filter(([,value])=>value).map(([field,value])=>({field,before:"",after:String(value)})));}
+  save(GPS_EQUIPMENT_KEY,records); $("#gpsEquipmentDialog").close(); toast(id?"Equipamento GPS atualizado.":"Equipamento GPS cadastrado."); render();
 }
 
 function openTacographDialog(id) {
@@ -883,13 +934,13 @@ function csvValue(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`
 function exportCsv(module) {
   if (module === "axiagro") module = state.axiagroTab === "controle" ? "axiagroControle" : "axiagroEstoque";
   const config = MODULES[module]; if (!config?.columns) return;
-  const rows = filteredRows(module); const columns = config.columns;
+  const rows = module==="gpsMonitoramento" ? stored(GPS_EQUIPMENT_KEY,[]) : filteredRows(module); const columns = config.columns;
   const csv = "\ufeff" + [columns.map(column => csvValue(LABELS[column] || column)).join(";"), ...rows.map(row => columns.map(column => csvValue(row[column])).join(";"))].join("\r\n");
   download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${module}-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 function backup() {
-  const payload = { version: 3, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), axiagroInstallations: stored(AXIAGRO_INSTALLATIONS_KEY, []), audit: stored(AUDIT_KEY, []) };
+  const payload = { version: 3, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), axiagroInstallations: stored(AXIAGRO_INSTALLATIONS_KEY, []), gpsEquipment: stored(GPS_EQUIPMENT_KEY, []), audit: stored(AUDIT_KEY, []) };
   download(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `backup-entressafra-${new Date().toISOString().slice(0, 10)}.json`); toast("Backup dos dados gerado.");
 }
 function toast(message, duration = 3000) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), duration); }
@@ -920,6 +971,7 @@ function bindGlobalEvents() {
   $("#recordForm").addEventListener("submit", persistForm);
   $("#teamForm").addEventListener("submit", saveTeam);
   $("#installationForm").addEventListener("submit", saveInstallation);
+  $("#gpsEquipmentForm").addEventListener("submit", saveGpsEquipment);
   $("#tacographForm").addEventListener("submit", saveTacograph);
   $("#axiagroItemForm").addEventListener("submit", saveAxiagroItem);
   $("#axiagroItemStock").addEventListener("change", updateAxiagroIdentificationFields);
