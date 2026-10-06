@@ -594,8 +594,63 @@ function render() {
   $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "tacografos", "gpsMonitoramento", "frotasBusca", "activity", "raw"].includes(state.route));
   const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, tacografos: renderTacographs, gpsMonitoramento: renderGpsMonitoring, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
+  if(!["dashboard","analytics","deadlines","quality","search","activity","raw"].includes(state.route)){
+    const anchor=$("#app .metrics, #app .module-summary, #app .page-heading");
+    anchor?.insertAdjacentHTML("afterend",renderProgressInsights(state.route));
+  }
   bindViewEvents();
   renderNotificationCenter();
+}
+
+function renderProgressInsights(route){
+  let rows=[]; let title="Progresso do módulo"; let bucketFor;
+  const source=state.data.modules[route]||[];
+  if(route==="gpsMonitoramento"){
+    rows=stored(GPS_EQUIPMENT_KEY,[]); title="Instalação e situação dos equipamentos GPS";
+    bucketFor=row=>({"Instalado":"done","Em manutenção":"progress","Em estoque":"pending","Retirado":"pending"}[row.situacaoGps]||"unknown");
+  }else if(route==="tacografos"){
+    rows=state.data.modules.caminhoesInfo||[]; title="Aferição e vencimentos da frota";
+    bucketFor=row=>({"Vencidos":"pending","90 dias":"progress","Válidos":"done","Revisar":"unknown"}[truckDocumentStatus(row).key]||"unknown");
+  }else if(route==="caminhoesInfo"){
+    rows=source; title="Completude da documentação";
+    bucketFor=row=>documentCompleteness(row)>=90?"done":"pending";
+  }else if(route==="funcionarios"){
+    rows=source; title="Situação da equipe";
+    bucketFor=row=>slug(row.situacao)==="ativo"?"done":isBlank(row.situacao)?"unknown":"pending";
+  }else if(route==="axiagro"){
+    if(state.axiagroTab==="estoque"){
+      rows=state.data.modules.axiagroEstoque||[]; title="Disponibilidade do estoque AXIAGRO";
+      bucketFor=row=>Number(row.quantidade)>2?"done":Number(row.quantidade)>0?"progress":"pending";
+    }else if(state.axiagroTab==="controle"){
+      rows=state.data.modules.axiagroControle||[]; title="Condição dos equipamentos AXIAGRO";
+      bucketFor=row=>/danific|reforma|pendente|nao encontrado|não encontrado/i.test(`${row.statusAparelho} ${row.statusSuporte} ${row.statusCelular}`)?"pending":!isBlank(row.mac)?"done":"unknown";
+    }else{
+      rows=stored(AXIAGRO_INSTALLATIONS_KEY,[]); title="Kits AXIAGRO instalados";
+      bucketFor=row=>(row.items||[]).length?"done":"unknown";
+    }
+  }else if(route==="carretasInfo"){
+    rows=source; title="Conformidade dos documentos de carretas";
+    bucketFor=row=>slug(row.possuiCrlv)==="sim"&&!isBlank(row.antt)?"done":isBlank(row.possuiCrlv)&&isBlank(row.antt)?"unknown":"pending";
+  }else if(route==="curvaS"){
+    rows=source; title="Planejado versus realizado";
+    bucketFor=row=>Number(row.realizado)>=Number(row.planejado)&&Number(row.planejado)>0?"done":Number(row.realizado)>0?"progress":Number(row.planejado)>0?"pending":"unknown";
+  }else{
+    rows=source; title=`Andamento · ${MODULES[route]?.label||"módulo"}`;
+    bucketFor=row=>{
+      if("status" in row)return ({"Concluído":"done","Em andamento":"progress","Pendente":"pending","Não informado":"unknown"})[normalizeStatus(row)]||"unknown";
+      const value=row.situacaoGps||row.operationalStatus||row.situacao||row.possuiRadio||row.possuiCrlv||row.tacografo||"";
+      const normalized=slug(value);
+      if(/conclu|feito|realizado|ativo|instalado|^sim$|^ok$/.test(normalized))return "done";
+      if(/andamento|manutenc|reforma/.test(normalized))return "progress";
+      if(/pend|venc|danific|inativo|retirado|^nao$/.test(normalized))return "pending";
+      return "unknown";
+    };
+  }
+  const counts={done:0,progress:0,pending:0,unknown:0}; rows.forEach(row=>counts[bucketFor(row)]++);
+  const total=rows.length; const pct=key=>total?Math.round(counts[key]/total*100):0;
+  const donePct=pct("done"), progressPct=pct("progress"), pendingPct=pct("pending");
+  const legend=[{key:"done",label:"Concluído / instalado",count:counts.done},{key:"progress",label:"Em andamento",count:counts.progress},{key:"pending",label:"Atenção necessária",count:counts.pending},{key:"unknown",label:"Sem informação",count:counts.unknown}];
+  return `<section class="progress-insights panel"><div class="panel-header"><div><span class="eyebrow">VISÃO DO MÓDULO</span><h3>${escapeHtml(title)}</h3><p>${total?`${total} registros considerados · atualizado a partir dos dados atuais`:"Cadastre registros para começar a acompanhar o andamento."}</p></div><span class="badge ${total&&donePct>=70?"done":""}">${donePct}% concluído / instalado</span></div><div class="progress-insights-content"><div class="progress-donut-wrap"><div class="progress-donut" style="--done:${donePct}%;--progress:${donePct+progressPct}%;--pending:${donePct+progressPct+pendingPct}%"><div><strong>${donePct}%</strong><small>andamento</small></div></div><span>${counts.done} de ${total} registros concluídos ou instalados</span></div><div class="progress-chart-list">${legend.map(item=>`<div class="progress-chart-row"><div><span class="progress-chart-dot ${item.key}"></span><span>${item.label}</span><strong>${item.count}</strong></div><div class="progress-chart-track"><i class="${item.key}" style="width:${pct(item.key)}%"></i></div></div>`).join("")}</div></div></section>`;
 }
 
 function bindViewEvents() {

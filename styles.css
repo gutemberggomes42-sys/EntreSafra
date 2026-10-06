@@ -150,6 +150,25 @@ h3 { font-size: 15px; }
 .module-summary article { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); background: var(--surface); padding: 12px 15px; border-radius: 9px; }
 .module-summary span { color: var(--muted); font-size: 11px; }
 .module-summary strong { font: 800 18px "Manrope"; }
+.progress-insights { margin: 0 0 18px; overflow: hidden; }
+.progress-insights .panel-header { min-height: 68px; }
+.progress-insights-content { display: grid; grid-template-columns: minmax(210px,.8fr) minmax(280px,1.2fr); gap: 24px; align-items: center; padding: 20px 24px; }
+.progress-donut-wrap { display: flex; align-items: center; gap: 18px; }
+.progress-donut { width: 142px; height: 142px; flex: 0 0 142px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--green-2) 0 var(--done),var(--blue) var(--done) var(--progress),var(--amber) var(--progress) var(--pending),var(--line) var(--pending) 100%); position: relative; }
+.progress-donut::before { content: ""; position: absolute; inset: 13px; border-radius: 50%; background: var(--surface); }
+.progress-donut > div { position: relative; display: grid; justify-items: center; }
+.progress-donut strong { font: 800 28px "Manrope"; letter-spacing: -.05em; }
+.progress-donut small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.progress-donut-wrap > span { max-width: 125px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.progress-chart-list { display: grid; gap: 14px; }
+.progress-chart-row > div:first-child { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.progress-chart-row strong { margin-left: auto; font: 700 12px "Manrope"; }
+.progress-chart-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.progress-chart-dot.done,.progress-chart-track i.done { background: var(--green-2); }
+.progress-chart-dot.progress,.progress-chart-track i.progress { background: var(--blue); }
+.progress-chart-dot.pending,.progress-chart-track i.pending { background: var(--amber); }
+.progress-chart-track { height: 7px; margin: 6px 0 0 16px; overflow: hidden; border-radius: 99px; background: var(--canvas); }
+.progress-chart-track i { display: block; height: 100%; border-radius: inherit; background: var(--line); transition: width .35s ease; }
 .view-toggle { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); }
 .view-toggle button { width: 31px; height: 29px; border: 0; background: transparent; color: var(--muted); border-radius: 5px; }
 .view-toggle button.active { background: var(--surface); color: var(--green-2); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
@@ -304,6 +323,7 @@ td:first-child { font-weight: 700; }
   .insights { grid-template-columns: 1fr; }.insights article { border-right: 0; border-bottom: 1px solid var(--line); }
 }
 @media (max-width: 760px) {
+  .progress-insights-content { grid-template-columns:1fr; gap:18px; padding:16px; }.progress-donut-wrap { justify-content:center; }
   .team-kpis,.team-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }.team-toolbar { align-items:stretch; flex-direction:column; }.team-member-filter { min-width:0; width:100%; }
   .quality-row { grid-template-columns:1fr; gap:10px; }.result-list button { grid-template-columns:1fr 20px; }.result-list span { grid-column:1/2; white-space:normal; }
   .document-grid { grid-template-columns:1fr; padding:12px; }.document-filters { order:3; width:100%; overflow:auto; flex-wrap:nowrap; padding-bottom:3px; }.filter-chip { white-space:nowrap; }
@@ -343,6 +363,7 @@ td:first-child { font-weight: 700; }
   .form-field.wide { grid-column: auto; }
 }
 @media (max-width: 430px) {
+  .progress-donut { width:120px; height:120px; flex-basis:120px; }.progress-donut strong { font-size:24px; }
   .metrics { grid-template-columns: 1fr; }
   .heading-actions { flex-direction: column; }
   .status-row { grid-template-columns: 102px 1fr 38px; }
