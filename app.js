@@ -12,7 +12,8 @@ const MODULES = {
   transbordos: { label: "Transbordos", icon: "▧", group: "Reformas", title: "Reforma de transbordos", description: "Programação, pendências e progresso dos transbordos.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias", "inicio", "fim", "dias"] },
   vivencias: { label: "Vivências", icon: "⌂", group: "Reformas", title: "Reforma de vivências", description: "Acompanhamento das áreas de vivência usadas na operação.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias"] },
   cci: { label: "Caminhões CCI", icon: "◈", group: "Reformas", title: "Caminhões de combate a incêndio", description: "Controle das reformas dos caminhões CCI e suas pendências.", key: "frota", columns: ["frota", "localizacao", "status", "pendencias"] },
-  caminhoesInfo: { label: "Documentos de caminhões", icon: "▤", group: "Documentação", title: "Documentação dos caminhões", description: "Placas, ANTT, tacógrafos, CRLV, rádio, adesivos e vencimentos.", key: "frota", columns: ["frota", "placa", "ano", "operacao", "antt", "tacografo", "dataAfericao", "vencimento", "possuiCrlv", "radio", "pintura"] },
+  caminhoesInfo: { label: "Documentos de caminhões", icon: "▤", group: "Documentação", title: "Documentação dos caminhões", description: "CRLV, ANTT, placas, rádio, adesivos e demais documentos da frota.", key: "frota", columns: ["frota", "placa", "ano", "operacao", "antt", "possuiCrlv", "radio", "pintura"] },
+  tacografos: { label: "Tacógrafos", icon: "◷", group: "Documentação", title: "Controle de tacógrafos", description: "Aferições, vencimentos e situação dos tacógrafos da frota." },
   carretasInfo: { label: "Documentos de carretas", icon: "▥", group: "Documentação", title: "Documentação das carretas", description: "Placas, lacres, CRLV, ANTT, faixas e itens de segurança.", key: "frota", columns: ["frota", "placa", "grupo", "situacaoPlaca", "lacre", "possuiCrlv", "antt", "faixaParachoque", "faixaRefletiva", "observacao"] },
   radios: { label: "Controle de rádios", icon: "⌁", group: "Controles", title: "Controle de rádios", description: "Identificação, frota, setor, disponibilidade e tipo de rádio.", key: "frota", columns: ["frota", "identificador", "descricao", "setor", "possuiRadio", "carregador", "tipo"] },
   axiagro: { label: "AXIAGRO", icon: "◉", group: "Controles", title: "Controle AXIAGRO", description: "Gestão dos celulares, suportes, lacres, fusíveis, endereços MAC e estoque de equipamentos AXIAGRO." },
@@ -121,6 +122,7 @@ function nav() {
 function navigate(route) {
   state.route = MODULES[route] ? route : "dashboard";
   state.page = 1; state.status = "Todos"; state.rawSheet = null; state.sortBy = ""; state.sortDir = "asc";
+  state.documentFilter = "Todos";
   location.hash = state.route;
   nav(); render();
   $("#sidebar").classList.remove("open");
@@ -274,7 +276,7 @@ function deadlineItems() {
     const explicit = slug(row.vencimento).includes("vencido") || slug(row.vencimento).includes("verificar");
     if (!date && !explicit) return;
     const days = date ? Math.ceil((date - today) / 86400000) : -1;
-    if (days <= 90) items.push({ ...row, date, days, kind: "Documento", module: "caminhoesInfo" });
+    if (days <= 90) items.push({ ...row, date, days, kind: "Tacógrafo", module: "caminhoesInfo" });
   });
   return items.sort((a,b) => a.days - b.days);
 }
@@ -394,16 +396,18 @@ function renderModule(module) {
 
 function truckDocumentStatus(row) {
   const text = slug(row.vencimento);
+  const deviceStatus=slug(row.tacografo);
   const date = parseDate(row.vencimento);
   const days = date ? Math.ceil((date - new Date()) / 86400000) : null;
   if (text.includes("vencido") || (days !== null && days < 0)) return { key:"Vencidos", label:"Vencido", tone:"danger", days };
+  if (/danific|pendente|manutenc|nao possui|sem tacografo/.test(deviceStatus)) return { key:"Revisar", label:"Revisar equipamento", tone:"pending", days };
   if (text.includes("verificar") || text.includes("acidente") || !row.vencimento) return { key:"Revisar", label:"Revisar", tone:"pending", days };
   if (days !== null && days <= 90) return { key:"90 dias", label:`Vence em ${days} dias`, tone:"pending", days };
   return { key:"Válidos", label:"Válido", tone:"done", days };
 }
 
 function documentCompleteness(row) {
-  const fields = ["frota","placa","operacao","dataAfericao","vencimento","possuiCrlv","anoCrlv","antt","tacografo"];
+  const fields = ["frota","placa","operacao","possuiCrlv","anoCrlv","antt","radio","pintura"];
   return Math.round(fields.filter(field=>!isBlank(row[field])).length/fields.length*100);
 }
 
@@ -411,18 +415,27 @@ function renderTruckDocuments() {
   const source = state.data.modules.caminhoesInfo || [];
   const query = slug(state.query);
   const enriched = source.map(row=>({ ...row, _docStatus:truckDocumentStatus(row), _complete:documentCompleteness(row) }));
-  const expired = enriched.filter(row=>row._docStatus.key==="Vencidos").length;
-  const upcoming = enriched.filter(row=>row._docStatus.key==="90 dias").length;
   const noCrlv = enriched.filter(row=>slug(row.possuiCrlv)!=="sim").length;
-  const pending = enriched.filter(row=>row._docStatus.key==="Revisar" || /pendente|verificar|aguardando|acidente/i.test(`${row.orcamento} ${row.pintura}`)).length;
+  const pending = enriched.filter(row=>slug(row.possuiCrlv)!=="sim" || isBlank(row.antt) || /pendente|verificar|aguardando|acidente/i.test(`${row.radio} ${row.pintura}`)).length;
   let rows = enriched.filter(row=>!query || slug(Object.values(row).join(" ")).includes(query));
-  if (state.documentFilter === "Vencidos") rows=rows.filter(row=>row._docStatus.key==="Vencidos");
-  if (state.documentFilter === "90 dias") rows=rows.filter(row=>row._docStatus.key==="90 dias");
   if (state.documentFilter === "Sem CRLV") rows=rows.filter(row=>slug(row.possuiCrlv)!=="sim");
-  if (state.documentFilter === "Pendências") rows=rows.filter(row=>row._docStatus.key==="Revisar" || /pendente|verificar|aguardando|acidente/i.test(`${row.orcamento} ${row.pintura}`));
+  if (state.documentFilter === "Pendências") rows=rows.filter(row=>slug(row.possuiCrlv)!=="sim" || isBlank(row.antt) || /pendente|verificar|aguardando|acidente/i.test(`${row.radio} ${row.pintura}`));
   if (state.documentFilter === "Completos") rows=rows.filter(row=>row._complete>=90);
   rows.sort((a,b)=>(a._docStatus.days??99999)-(b._docStatus.days??99999));
-  return `${pageHeading("Documentos de caminhões","Central de conformidade documental, vencimentos, CRLV, ANTT e tacógrafos da frota.")}<div class="metrics"><article class="metric"><span class="label">Veículos monitorados</span><strong>${source.length}</strong><small>base documental completa</small></article><article class="metric danger"><span class="label">Vencidos</span><strong>${expired}</strong><small>exigem regularização</small></article><article class="metric warning"><span class="label">Próximos 90 dias</span><strong>${upcoming}</strong><small>programar renovação</small></article><article class="metric"><span class="label">Pendências documentais</span><strong>${pending}</strong><small>${noCrlv} sem CRLV confirmado</small></article></div><section class="panel truck-documents"><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, placa ou operação"></label><div class="document-filters">${["Todos","Vencidos","90 dias","Sem CRLV","Pendências","Completos"].map(value=>`<button class="filter-chip ${state.documentFilter===value?'active':''}" data-document-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><div class="view-toggle"><button class="${state.documentView==='cards'?'active':''}" data-document-view="cards" title="Cartões">▦</button><button class="${state.documentView==='table'?'active':''}" data-document-view="table" title="Tabela">▤</button></div><span class="badge">${rows.length} veículos</span></div>${state.documentView==='cards'?`<div class="document-grid">${rows.map(row=>`<article class="document-card ${row._docStatus.tone}"><button class="document-card-main" data-open="caminhoesInfo|${row.id}"><header><div><span class="eyebrow">Frota ${escapeHtml(row.frota)}</span><h3>${escapeHtml(row.placa||'Sem placa')}</h3></div>${badge(row._docStatus.label)}</header><p>${escapeHtml(row.operacao||'Operação não informada')} · ${escapeHtml(row.ano||'Ano não informado')}</p><div class="doc-chips"><span class="${slug(row.possuiCrlv)==='sim'?'ok':'missing'}">CRLV ${escapeHtml(row.anoCrlv||'—')}</span><span class="${!isBlank(row.antt)?'ok':'missing'}">ANTT</span><span class="${!isBlank(row.tacografo)?'ok':'missing'}">Tacógrafo</span></div><div class="completeness"><span><i style="width:${row._complete}%"></i></span><small>${row._complete}% completo</small></div><div class="tacografo-dates"><div><span>Tacógrafo feito em</span><strong>${formatValue(row.dataAfericao,'dataAfericao')}</strong></div><div><span>Vence em</span><strong>${formatValue(row.vencimento,'vencimento')}</strong></div></div></button><button class="document-edit" data-edit="caminhoesInfo|${row.id}">Editar documentos</button></article>`).join('')}</div>`:`<div class="table-wrap"><table><thead><tr><th>Frota</th><th>Placa</th><th>Operação</th><th>Tacógrafo feito em</th><th>Vence em</th><th>Situação</th><th>CRLV</th><th>ANTT</th><th>Tacógrafo</th><th>Completude</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr data-open="caminhoesInfo|${row.id}"><td><strong>${escapeHtml(row.frota)}</strong></td><td>${escapeHtml(row.placa)}</td><td>${escapeHtml(row.operacao)}</td><td>${formatValue(row.dataAfericao,'dataAfericao')}</td><td>${formatValue(row.vencimento,'vencimento')}</td><td>${badge(row._docStatus.label)}</td><td>${badge(row.possuiCrlv||'Não informado')}</td><td>${formatValue(row.antt,'antt')}</td><td>${formatValue(row.tacografo,'tacografo')}</td><td><span class="badge">${row._complete}%</span></td><td><button class="row-action" data-edit="caminhoesInfo|${row.id}">•••</button></td></tr>`).join('')}</tbody></table></div>`}${!rows.length?`<div class="empty-state"><strong>Nenhum veículo encontrado</strong>Ajuste a busca ou os filtros documentais.</div>`:''}</section>`;
+  return `${pageHeading("Documentos de caminhões","Documentação individual da frota: CRLV, ANTT, placas, rádio, adesivos e demais itens.")}<div class="metrics"><article class="metric"><span class="label">Veículos monitorados</span><strong>${source.length}</strong><small>cadastros documentais</small></article><article class="metric danger"><span class="label">Sem CRLV confirmado</span><strong>${noCrlv}</strong><small>verifique a documentação</small></article><article class="metric warning"><span class="label">Pendências documentais</span><strong>${pending}</strong><small>revisar informações</small></article><article class="metric"><span class="label">Cadastros completos</span><strong>${enriched.filter(row=>row._complete>=90).length}</strong><small>documentos preenchidos</small></article></div><section class="panel truck-documents"><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, placa ou operação"></label><div class="document-filters">${["Todos","Sem CRLV","Pendências","Completos"].map(value=>`<button class="filter-chip ${state.documentFilter===value?'active':''}" data-document-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><div class="view-toggle"><button class="${state.documentView==='cards'?'active':''}" data-document-view="cards" title="Cartões">▦</button><button class="${state.documentView==='table'?'active':''}" data-document-view="table" title="Tabela">▤</button></div><span class="badge">${rows.length} veículos</span></div>${state.documentView==='cards'?`<div class="document-grid">${rows.map(row=>`<article class="document-card"><button class="document-card-main" data-open="caminhoesInfo|${row.id}"><header><div><span class="eyebrow">Frota ${escapeHtml(row.frota)}</span><h3>${escapeHtml(row.placa||'Sem placa')}</h3></div>${badge(row._complete>=90?'Completo':'Revisar')}</header><p>${escapeHtml(row.operacao||'Operação não informada')} · ${escapeHtml(row.ano||'Ano não informado')}</p><div class="doc-chips"><span class="${slug(row.possuiCrlv)==='sim'?'ok':'missing'}">CRLV ${escapeHtml(row.anoCrlv||'—')}</span><span class="${!isBlank(row.antt)?'ok':'missing'}">ANTT</span><span class="${!isBlank(row.radio)?'ok':'missing'}">Rádio</span></div><div class="completeness"><span><i style="width:${row._complete}%"></i></span><small>${row._complete}% preenchido</small></div></button><button class="document-edit" data-edit="caminhoesInfo|${row.id}">Editar documentos</button></article>`).join('')}</div>`:`<div class="table-wrap"><table><thead><tr><th>Frota</th><th>Placa</th><th>Operação</th><th>CRLV</th><th>ANTT</th><th>Rádio</th><th>Adesivos</th><th>Completude</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${escapeHtml(row.frota)}</strong></td><td>${escapeHtml(row.placa)}</td><td>${escapeHtml(row.operacao)}</td><td>${badge(row.possuiCrlv||'Não informado')}</td><td>${formatValue(row.antt,'antt')}</td><td>${formatValue(row.radio,'radio')}</td><td>${formatValue(row.pintura,'pintura')}</td><td><span class="badge">${row._complete}%</span></td><td><button class="row-action" data-edit="caminhoesInfo|${row.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`}${!rows.length?`<div class="empty-state"><strong>Nenhum veículo encontrado</strong>Ajuste a busca ou os filtros documentais.</div>`:''}</section>`;
+}
+
+function renderTacographs() {
+  const source = state.data.modules.caminhoesInfo || [];
+  const query = slug(state.query);
+  const rows = source.map(row=>({ ...row, _docStatus:truckDocumentStatus(row) }))
+    .filter(row=>!query || slug(`${row.frota} ${row.placa} ${row.operacao} ${row.tacografo}`).includes(query))
+    .filter(row=>state.documentFilter==="Todos" || row._docStatus.key===state.documentFilter)
+    .sort((a,b)=>(a._docStatus.days??99999)-(b._docStatus.days??99999));
+  const expired=source.filter(row=>truckDocumentStatus(row).key==="Vencidos").length;
+  const upcoming=source.filter(row=>truckDocumentStatus(row).key==="90 dias").length;
+  const review=source.filter(row=>truckDocumentStatus(row).key==="Revisar").length;
+  return `${pageHeading(MODULES.tacografos.title,MODULES.tacografos.description)}<div class="metrics"><article class="metric"><span class="label">Tacógrafos cadastrados</span><strong>${source.filter(row=>!isBlank(row.tacografo)).length}</strong><small>de ${source.length} veículos</small></article><article class="metric danger"><span class="label">Vencidos</span><strong>${expired}</strong><small>precisam de aferição</small></article><article class="metric warning"><span class="label">Vencem em até 90 dias</span><strong>${upcoming}</strong><small>programar atendimento</small></article><article class="metric"><span class="label">Sem data de vencimento</span><strong>${review}</strong><small>confirmar cadastro</small></article></div><section class="panel truck-documents"><div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, placa ou situação"></label><div class="document-filters">${["Todos","Vencidos","90 dias","Revisar","Válidos"].map(value=>`<button class="filter-chip ${state.documentFilter===value?'active':''}" data-document-filter="${value}">${value}</button>`).join('')}</div><span class="spacer"></span><span class="badge">${rows.length} veículos</span></div><div class="table-wrap"><table><thead><tr><th>Frota</th><th>Placa</th><th>Operação</th><th>Data da aferição</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${escapeHtml(row.frota||'—')}</strong></td><td>${escapeHtml(row.placa||'—')}</td><td>${escapeHtml(row.operacao||'—')}</td><td>${formatValue(row.dataAfericao,'dataAfericao')}</td><td>${formatValue(row.vencimento,'vencimento')}</td><td>${badge(row._docStatus.label)}</td><td><button class="secondary-button" data-tacograph-edit="${escapeHtml(row.id)}">Editar tacógrafo</button></td></tr>`).join('')}</tbody></table></div>${!rows.length?`<div class="empty-state"><strong>Nenhum tacógrafo encontrado</strong>Revise os filtros ou a pesquisa.</div>`:''}</section>`;
 }
 
 function renderAxiagroInstallations(stock) {
@@ -557,8 +570,8 @@ function renderRaw() {
 
 function render() {
   $("#breadcrumb").textContent = MODULES[state.route].label;
-  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "frotasBusca", "activity", "raw"].includes(state.route));
-  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
+  $("#newRecordButton").classList.toggle("hidden", ["dashboard", "analytics", "deadlines", "quality", "search", "axiagro", "tacografos", "frotasBusca", "activity", "raw"].includes(state.route));
+  const special = { dashboard: renderDashboard, analytics: renderAnalytics, deadlines: renderDeadlines, quality: renderQuality, search: renderGlobalSearch, caminhoesInfo: renderTruckDocuments, tacografos: renderTacographs, axiagro: renderAxiagro, funcionarios: renderEmployees, activity: renderActivity, raw: renderRaw };
   $("#app").innerHTML = special[state.route] ? special[state.route]() : renderModule(state.route);
   bindViewEvents();
   renderNotificationCenter();
@@ -577,6 +590,7 @@ function bindViewEvents() {
     const [module, id] = element.dataset.open.split("|"); openDetails(module, id);
   }));
   $$('[data-edit]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); const [module, id] = button.dataset.edit.split("|"); openForm(module, id); }));
+  $$('[data-tacograph-edit]').forEach(button => button.addEventListener("click", () => openTacographDialog(button.dataset.tacographEdit)));
   const localSearch = $("[data-local-search]");
   if (localSearch) localSearch.addEventListener("input", event => { state.query = event.target.value; state.page = 1; render(); requestAnimationFrame(() => { const input = $("[data-local-search]"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); });
   const statusFilter = $("[data-status-filter]");
@@ -635,6 +649,30 @@ function saveInstallation(event){
   if(id){const item=installations.find(entry=>entry.id===id);if(item)Object.assign(item,values,{updatedAt:new Date().toISOString()});}
   else {const item={id:`installation-${Date.now()}`,...values,items:[],createdAt:new Date().toISOString()};installations.push(item);state.selectedAxiagroInstallation=item.id;}
   save(AXIAGRO_INSTALLATIONS_KEY,installations); audit(id?"Edição":"Inclusão","axiagroControle",{id:id||state.selectedAxiagroInstallation,frota:values.fleet},"Equipamento AXIAGRO"); $("#installationDialog").close(); toast("Equipamento AXIAGRO salvo."); render();
+}
+
+function openTacographDialog(id) {
+  const record=findRecord("caminhoesInfo",id); if(!record)return;
+  const form=$("#tacographForm"); form.dataset.recordId=id;
+  $("#tacographFleet").value=record.frota||"";
+  const status=$("#tacographStatus");
+  const current=String(record.tacografo||"");
+  status.innerHTML=[...new Set([current,"OK","Pendente","Danificado","Não possui"])].filter(Boolean).map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
+  status.value=current;
+  const toInput=value=>{const date=parseDate(value);return date?`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`:"";};
+  $("#tacographDone").value=toInput(record.dataAfericao);
+  $("#tacographDue").value=toInput(record.vencimento);
+  $("#tacographDialog").showModal();
+}
+
+function saveTacograph(event) {
+  event.preventDefault();
+  const id=event.currentTarget.dataset.recordId; const record=findRecord("caminhoesInfo",id); if(!record)return;
+  const values={tacografo:$("#tacographStatus").value,dataAfericao:$("#tacographDone").value,vencimento:$("#tacographDue").value};
+  const changes=Object.entries(values).filter(([field,next])=>String(record[field]??"")!==String(next??"")).map(([field,next])=>({field,before:String(record[field]??""),after:String(next??"")}));
+  const patches=stored(PATCH_KEY,{}); patches[id]={...(patches[id]||{}),...values}; save(PATCH_KEY,patches); Object.assign(record,values);
+  audit("Edição","tacografos",record,changes.length?`Campos alterados: ${changes.map(change=>LABELS[change.field]||change.field).join(", ")}`:"Nenhum campo alterado",changes);
+  $("#tacographDialog").close(); toast("Dados do tacógrafo atualizados."); render();
 }
 
 function changeAxiagroStock(stockId,delta){
@@ -781,7 +819,7 @@ function openForm(module = state.route, id = null) {
   const original = id ? findRecord(module, id) : {};
   if (!config || !config.columns) return;
   state.selected = { module, id };
-  const fields = [...new Set([...config.columns, ...Object.keys(original).filter(key => !key.startsWith("_") && !["id", "statusNormalizado"].includes(key))])];
+  const fields = [...new Set([...config.columns, ...Object.keys(original).filter(key => !key.startsWith("_") && !["id", "statusNormalizado", ...(module === "caminhoesInfo" ? ["tacografo", "dataAfericao", "vencimento"] : [])].includes(key))])];
   $("#dialogEyebrow").textContent = config.label;
   $("#dialogTitle").textContent = id ? "Editar registro" : "Novo registro";
   $("#deleteButton").classList.toggle("hidden", !id);
@@ -875,6 +913,7 @@ function bindGlobalEvents() {
   $("#recordForm").addEventListener("submit", persistForm);
   $("#teamForm").addEventListener("submit", saveTeam);
   $("#installationForm").addEventListener("submit", saveInstallation);
+  $("#tacographForm").addEventListener("submit", saveTacograph);
   $("#axiagroItemForm").addEventListener("submit", saveAxiagroItem);
   $("#axiagroItemStock").addEventListener("change", updateAxiagroIdentificationFields);
   $("#axiagroReturnForm").addEventListener("submit", removeAxiagroItem);

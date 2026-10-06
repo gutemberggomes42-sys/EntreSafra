@@ -130,6 +130,19 @@
     </form>
   </dialog>
 
+  <dialog id="tacographDialog" class="dialog">
+    <form method="dialog" id="tacographForm">
+      <div class="dialog-header"><div><span class="eyebrow">DOCUMENTAÇÃO · TACÓGRAFO</span><h2>Atualizar aferição</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><div class="form-grid">
+        <div class="form-field"><label for="tacographFleet">Frota</label><input id="tacographFleet" readonly></div>
+        <div class="form-field"><label for="tacographStatus">Situação</label><select id="tacographStatus" name="tacografo"></select></div>
+        <div class="form-field"><label for="tacographDone">Data da aferição</label><input id="tacographDone" name="dataAfericao" type="date"></div>
+        <div class="form-field"><label for="tacographDue">Data de vencimento</label><input id="tacographDue" name="vencimento" type="date"></div>
+      </div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Salvar tacógrafo</button></div>
+    </form>
+  </dialog>
+
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve); window.firebaseAuthReady = new Promise(resolve => window.__resolveFirebaseAuth = resolve);</script>
   <script type="module" src="firebase-sync.js?v=20261006-3"></script>
   <script src="data.js?v=20261005-2" defer></script>
