@@ -662,8 +662,9 @@ function openTacographDialog(id) {
   const form=$("#tacographForm"); form.dataset.recordId=id;
   $("#tacographFleet").value=record.frota||"";
   const status=$("#tacographStatus");
-  const current=String(record.tacografo||"");
-  status.innerHTML=[...new Set([current,"OK","Pendente","Danificado","Não possui"])].filter(Boolean).map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
+  const storedStatus=String(record.tacografo||"").trim();
+  const current=["ok","sim"].includes(slug(storedStatus))?"SIM":storedStatus;
+  status.innerHTML=[...new Set([current,"SIM","Pendente","Danificado","Não possui"])].filter(Boolean).map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
   status.value=current;
   const toInput=value=>{const date=parseDate(value);return date?`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`:"";};
   $("#tacographDone").value=toInput(record.dataAfericao);
