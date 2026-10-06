@@ -49,7 +49,7 @@ const LABELS = {
   ,tipoEquipamento: "Equipamento GPS", identificadorGps: "Identificação GPS", localTrabalho: "Local de trabalho", situacaoGps: "Situação", dataInstalacao: "Data da instalação"
 };
 
-const state = { data: null, route: "dashboard", query: "", status: "Todos", company: "Todas", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas", gpsTypeFilter: "Todos" };
+const state = { data: null, route: "dashboard", query: "", status: "Todos", company: "Todas", page: 1, pageSize: 25, sortBy: "", sortDir: "asc", selected: null, rawSheet: null, viewMode: "table", documentFilter: "Todos", documentView: "cards", axiagroTab: "instalacoes", axiagroFilter: "Todos", axiagroFront: "Todas", selectedAxiagroInstallation: null, employeeLocation: "Todos", employeeView: "locations", selectedTeam: null, teamQuery: "", teamStatus: "Todas", gpsTypeFilter: "Todos", purchaseOrderFilter: "Todos" };
 const PATCH_KEY = "entressafra-v1-patches";
 const NEW_KEY = "entressafra-v1-new";
 const DELETE_KEY = "entressafra-v1-deleted";
@@ -60,6 +60,7 @@ const AXIAGRO_INSTALLATIONS_KEY = "entressafra-v1-axiagro-installations";
 const AXIAGRO_STOCK_MIGRATION_KEY = "entressafra-v1-axiagro-stock-migrated";
 const AXIAGRO_PHONE_SEED_KEY = "entressafra-v1-axiagro-phone-seeded";
 const GPS_EQUIPMENT_KEY = "entressafra-v1-gps-equipments";
+const AXIAGRO_PURCHASE_ORDERS_KEY = "entressafra-v1-axiagro-purchase-orders";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -482,6 +483,19 @@ function renderAxiagroInstallations(stock) {
   return `<div class="installations-overview"><div class="installation-overview-head"><div><span class="eyebrow">Patrimônio instalado</span><h2>Frotas e equipamentos AXIAGRO</h2><p>Consulte a situação e a localização de cada frota, veja os componentes instalados e acompanhe o estoque em tempo real.</p></div><button class="primary-button" data-installation-new>＋ Cadastrar frota</button></div><div class="installation-summary"><article class="installation-kpi"><span class="installation-kpi-icon">▣</span><div><small>Frotas cadastradas</small><strong>${installations.length}</strong><span>equipamentos monitorados</span></div></article><article class="installation-kpi"><span class="installation-kpi-icon green">⌁</span><div><small>Componentes instalados</small><strong>${totalInstalled}</strong><span>${installedTypes} tipos de componente em uso</span></div></article><article class="installation-kpi"><span class="installation-kpi-icon blue">▦</span><div><small>Unidades disponíveis</small><strong>${availableUnits}</strong><span>${stock.length} itens no catálogo</span></div></article><article class="installation-kpi ${damagedUnits||lowStockTypes?"attention":""}"><span class="installation-kpi-icon amber">!</span><div><small>Itens para reposição</small><strong>${damagedUnits}</strong><span>danificados · ${lowStockTypes} tipos com estoque baixo</span></div></article></div><section class="installation-fleet-panel"><div class="installation-fleet-heading"><div><span class="eyebrow">VISÃO DA OPERAÇÃO</span><h3>Equipamentos por frota</h3><p>Filtre por frente ou pesquise identificação, local e componente.</p></div><span class="badge">${visible.length} de ${installations.length} frotas</span></div><div class="installation-toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar frota, local, MAC ou lacre"></label><div class="document-filters">${["Todas",...fronts].map(front=>`<button class="filter-chip ${state.axiagroFront===front?'active':''}" data-axiagro-front="${escapeHtml(front)}">${front==="Todas"?"Todas":`Frente ${escapeHtml(front)}`}</button>`).join("")}</div></div>${visible.length?`<div class="installation-grid">${visible.map(item=>{const entries=item.items||[];const count=entries.reduce((sum,entry)=>sum+Number(entry.quantity),0);const componentNames=[...new Set(entries.map(entry=>stockById.get(entry.stockId)?.equipamento).filter(Boolean))];const status=item.operationalStatus||"Em operação";const statusClass=slug(status).includes("manutenc")?"pending":slug(status).includes("indispon")?"danger":"done";return `<button class="installation-card" data-installation-open="${escapeHtml(item.id)}"><span class="installation-card-icon">${escapeHtml(String(item.fleet).slice(-2))}</span><span class="installation-card-main"><span class="installation-card-eyebrow">AXIAGRO · FRENTE ${escapeHtml(item.front||"—")}</span><strong>Frota ${escapeHtml(item.fleet)}</strong><small>${escapeHtml(item.description||"Equipamento não informado")}</small><span class="installation-card-status ${statusClass}">${badge(status)}<span>⌖ ${escapeHtml(item.location||"Local não informado")}</span></span><span class="installation-component-list">${componentNames.length?componentNames.slice(0,3).map(name=>`<i>${escapeHtml(name)}</i>`).join(""):`<i class="empty-component">Nenhum componente instalado</i>`}${componentNames.length>3?`<i>+${componentNames.length-3}</i>`:""}</span></span><span class="installation-card-count ${count?"has-items":""}"><strong>${count}</strong><small>peças</small></span><span class="installation-card-arrow">›</span></button>`}).join("")}</div>`:`<div class="empty-state"><strong>${installations.length?"Nenhuma frota encontrada":"Nenhum equipamento cadastrado"}</strong>${installations.length?"Altere a busca ou selecione outra frente.":"Cadastre a frota para começar a acompanhar os componentes AXIAGRO."}</div>`}</section></div>`;
 }
 
+const AXIAGRO_ORDER_STAGES=["Solicitado","Aprovado","Pedido realizado","Em trânsito","Recebido","Cancelado"];
+function renderAxiagroPurchaseOrders(stock){
+  const orders=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]);
+  const stockById=new Map(stock.map(item=>[item.id,item]));
+  const query=slug(state.query);
+  const filtered=orders.filter(order=>(state.purchaseOrderFilter==="Todos"||order.status===state.purchaseOrderFilter)&&(!query||slug(`${order.equipmentName} ${order.model} ${order.requester} ${order.supplier} ${order.orderNumber} ${order.notes}`).includes(query)))
+    .sort((a,b)=>(Date.parse(b.updatedAt||b.requestedAt)||0)-(Date.parse(a.updatedAt||a.requestedAt)||0));
+  const open=orders.filter(order=>!['Recebido','Cancelado'].includes(order.status)).length;
+  const ordered=orders.filter(order=>['Pedido realizado','Em trânsito'].includes(order.status)).length;
+  const received=orders.filter(order=>order.status==='Recebido').reduce((sum,order)=>sum+Number(order.quantity||0),0);
+  return `<div class="purchase-orders-page"><div class="purchase-orders-intro"><div><span class="eyebrow">COMPRAS · AXIAGRO</span><h2>Pedidos e reposição</h2><p>Registre a necessidade, acompanhe cada etapa e receba a quantidade aprovada direto no estoque AXIAGRO.</p></div><button class="primary-button" data-purchase-new>＋ Registrar pedido</button></div><div class="purchase-order-summary"><article><span>Pedidos em aberto</span><strong>${open}</strong><small>aguardando conclusão</small></article><article><span>Em compra / transporte</span><strong>${ordered}</strong><small>pedido realizado ou em trânsito</small></article><article><span>Unidades recebidas</span><strong>${received}</strong><small>somadas ao estoque</small></article></div><div class="toolbar purchase-order-toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar item, fornecedor ou número do pedido"></label><div class="document-filters">${["Todos",...AXIAGRO_ORDER_STAGES].map(value=>`<button class="filter-chip ${state.purchaseOrderFilter===value?'active':''}" data-purchase-filter="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join("")}</div><span class="spacer"></span><span class="badge">${filtered.length} pedidos</span></div>${filtered.length?`<div class="purchase-order-list">${filtered.map(order=>{const stockItem=stockById.get(order.stockId);const stageIndex=AXIAGRO_ORDER_STAGES.indexOf(order.status);const progress=order.status==="Cancelado"?0:Math.max(0,Math.min(100,stageIndex/4*100));const terminal=["Recebido","Cancelado"].includes(order.status);return `<article class="purchase-order-card ${order.status==="Cancelado"?"cancelled":""}"><div class="purchase-order-card-head"><div><span class="eyebrow">${escapeHtml(order.requestNumber||`PED-${String(order.createdAt||"").slice(0,10).replaceAll("-","")}-${String(order.id).slice(-4)}`)}</span><h3>${escapeHtml(order.equipmentName||stockItem?.equipamento||"Item AXIAGRO")}</h3><p>${escapeHtml(order.model||stockItem?.modelo||"Modelo não informado")} · Quantidade: <strong>${escapeHtml(order.quantity)}</strong></p></div><div class="purchase-order-card-actions">${badge(order.status||"Solicitado")}<button class="row-action" data-purchase-edit="${escapeHtml(order.id)}" ${terminal?"disabled title=\"Pedido encerrado\"":"title=\"Editar pedido\""}>✎</button></div></div><div class="purchase-order-progress"><div class="purchase-order-progress-track"><i style="width:${progress}%"></i></div><div class="purchase-order-stages">${AXIAGRO_ORDER_STAGES.slice(0,5).map((stage,index)=>`<span class="${stageIndex>=index&&order.status!=="Cancelado"?"reached":""}">${stage}</span>`).join("")}</div></div><div class="purchase-order-meta"><span><small>Solicitado por</small><strong>${escapeHtml(order.requester||"—")}</strong></span><span><small>Data do pedido</small><strong>${formatValue(order.requestedAt,"dataPedido")}</strong></span><span><small>Previsão de chegada</small><strong>${formatValue(order.expectedDate,"dataPrevisao")}</strong></span><span><small>Fornecedor / OC</small><strong>${escapeHtml([order.supplier,order.orderNumber].filter(Boolean).join(" · ")||"Aguardando cotação")}</strong></span></div>${order.notes?`<p class="purchase-order-notes">${escapeHtml(order.notes)}</p>`:""}<div class="purchase-order-update"><label><span>Atualizar andamento</span><select data-purchase-status="${escapeHtml(order.id)}" ${terminal?"disabled":""}>${AXIAGRO_ORDER_STAGES.map(stage=>`<option ${order.status===stage?"selected":""}>${stage}</option>`).join("")}</select></label>${order.stockReceivedAt?`<small>✓ ${Number(order.quantity)} unidade(s) adicionada(s) ao estoque em ${new Date(order.stockReceivedAt).toLocaleDateString("pt-BR")}</small>`:terminal&&order.status==="Cancelado"?`<small>Pedido cancelado · sem entrada no estoque</small>`:""}</div></article>`}).join("")}</div>`:`<div class="empty-state purchase-order-empty"><strong>${orders.length?"Nenhum pedido encontrado":"Nenhum pedido de compra registrado"}</strong>${orders.length?"Altere a busca ou o filtro de andamento.":"Registre uma necessidade de compra para iniciar o acompanhamento."}<br>${!orders.length?`<button class="primary-button" data-purchase-new>＋ Registrar primeiro pedido</button>`:""}</div>`}</div>`;
+}
+
 function renderAxiagro() {
   const controls = state.data.modules.axiagroControle || [];
   const stock = state.data.modules.axiagroEstoque || [];
@@ -513,6 +527,7 @@ function renderAxiagro() {
   const stockColumns = MODULES.axiagroEstoque.columns;
   const isControl = state.axiagroTab === "controle";
   const isInstallation = state.axiagroTab === "instalacoes";
+  const isPurchaseOrders = state.axiagroTab === "pedidos";
   const rows = isControl ? controlRows : stockRows;
   const columns = isControl ? controlColumns : stockColumns;
   const module = isControl ? "axiagroControle" : "axiagroEstoque";
@@ -525,10 +540,10 @@ function renderAxiagro() {
       <article class="metric danger"><span class="label">Danificados / pedir</span><strong>${damagedTotal}</strong><small>${lowStock} tipos com estoque baixo</small></article>
     </div>
     <section class="panel axiagro-panel">
-      <div class="subnav axiagro-subnav"><button class="${isInstallation ? "active" : ""}" data-axiagro-tab="instalacoes"><span>⌘</span><div><strong>Instalações por equipamento</strong><small>${installations.length} frotas</small></div></button><button class="${!isInstallation ? "active" : ""}" data-axiagro-tab="estoque"><span>▦</span><div><strong>Estoque AXIAGRO</strong><small>${stock.length} tipos de componente</small></div></button></div>
-      ${isInstallation?renderAxiagroInstallations(stock):`<div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar equipamento ou modelo..."></label><div class="axiagro-filters">${["Todos","Sem estoque","Estoque baixo","Disponível"].map(value=>`<button class="filter-chip ${state.axiagroFilter===value?'active':''}" data-axiagro-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><button class="primary-button" data-axiagro-new="${module}">＋ Adicionar item</button></div>
+      <div class="subnav axiagro-subnav"><button class="${isInstallation ? "active" : ""}" data-axiagro-tab="instalacoes"><span>⌘</span><div><strong>Instalações por equipamento</strong><small>${installations.length} frotas</small></div></button><button class="${state.axiagroTab==="estoque" ? "active" : ""}" data-axiagro-tab="estoque"><span>▦</span><div><strong>Estoque AXIAGRO</strong><small>${stock.length} tipos de componente</small></div></button><button class="${isPurchaseOrders ? "active" : ""}" data-axiagro-tab="pedidos"><span>▤</span><div><strong>Pedidos de compra</strong><small>${stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]).filter(order=>!['Recebido','Cancelado'].includes(order.status)).length} em aberto</small></div></button></div>
+      ${isInstallation?renderAxiagroInstallations(stock):isPurchaseOrders?renderAxiagroPurchaseOrders(stock):`<div class="toolbar"><label class="field-inline"><span>⌕</span><input data-local-search type="search" value="${escapeHtml(state.query)}" placeholder="Buscar equipamento ou modelo..."></label><div class="axiagro-filters">${["Todos","Sem estoque","Estoque baixo","Disponível"].map(value=>`<button class="filter-chip ${state.axiagroFilter===value?'active':''}" data-axiagro-filter="${value}">${value}</button>`).join('')}</div><div class="spacer"></div><button class="primary-button" data-axiagro-new="${module}">＋ Adicionar item</button></div>
       <div class="table-wrap"><table><thead><tr><th>Equipamento</th><th>Modelo</th><th>Disponível</th><th>Instalado</th><th>Danificado</th><th>Ação</th><th></th></tr></thead><tbody>
-        ${rows.length ? rows.map(row => {const available=Number(row.quantidade)||0;const installed=installedByStock.get(row.id)||0;const damaged=damagedByStock.get(row.id)||0;return `<tr data-open="${module}|${row.id}"><td><strong>${escapeHtml(row.equipamento)}</strong></td><td>${escapeHtml(row.modelo||'—')}</td><td>${badge(available>0?`${available} disponível`:'Sem estoque')}</td><td><span class="badge">${installed} instalado${installed===1?'':'s'}</span></td><td>${damaged?`<span class="badge danger">${damaged} danificado${damaged===1?'':'s'}</span>`:'<span class="badge done">0</span>'}</td><td>${damaged?'<span class="purchase-order">Fazer pedido</span>':available<=2?'<span class="badge pending">Estoque baixo</span>':'<span class="badge done">Regular</span>'}</td><td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`}).join("") : `<tr><td colspan="7"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Ajuste sua busca ou o filtro.</div></td></tr>`}
+        ${rows.length ? rows.map(row => {const available=Number(row.quantidade)||0;const installed=installedByStock.get(row.id)||0;const damaged=damagedByStock.get(row.id)||0;return `<tr data-open="${module}|${row.id}"><td><strong>${escapeHtml(row.equipamento)}</strong></td><td>${escapeHtml(row.modelo||'—')}</td><td>${badge(available>0?`${available} disponível`:'Sem estoque')}</td><td><span class="badge">${installed} instalado${installed===1?'':'s'}</span></td><td>${damaged?`<span class="badge danger">${damaged} danificado${damaged===1?'':'s'}</span>`:'<span class="badge done">0</span>'}</td><td>${damaged||available<=2?`<button class="purchase-order" data-purchase-new="${row.id}">＋ Registrar pedido</button>`:'<span class="badge done">Regular</span>'}</td><td><button class="row-action" data-edit="${module}|${row.id}" aria-label="Editar">•••</button></td></tr>`}).join("") : `<tr><td colspan="7"><div class="empty-state"><strong>Nenhum registro encontrado</strong>Ajuste sua busca ou o filtro.</div></td></tr>`}
       </tbody></table></div><div class="table-footer"><span>${rows.length} registros exibidos</span><span>${isControl?`${attention} controles exigem revisão`:`${lowStock} itens precisam de reposição`}</span></div>`}
     </section>`;
 }
@@ -631,6 +646,9 @@ function renderProgressInsights(route){
     if(state.axiagroTab==="estoque"){
       rows=state.data.modules.axiagroEstoque||[]; title="Disponibilidade do estoque AXIAGRO";
       bucketFor=row=>Number(row.quantidade)>2?"done":Number(row.quantidade)>0?"progress":"pending";
+    }else if(state.axiagroTab==="pedidos"){
+      rows=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]); title="Andamento dos pedidos AXIAGRO";
+      bucketFor=row=>row.status==="Recebido"?"done":row.status==="Cancelado"?"unknown":["Pedido realizado","Em trânsito"].includes(row.status)?"progress":"pending";
     }else if(state.axiagroTab==="controle"){
       rows=state.data.modules.axiagroControle||[]; title="Condição dos equipamentos AXIAGRO";
       bucketFor=row=>/danific|reforma|pendente|nao encontrado|não encontrado/i.test(`${row.statusAparelho} ${row.statusSuporte} ${row.statusCelular}`)?"pending":!isBlank(row.mac)?"done":"unknown";
@@ -674,6 +692,10 @@ function bindViewEvents() {
   $$("[data-gps-new]").forEach(button=>button.addEventListener("click",()=>openGpsDialog()));
   $$("[data-gps-edit]").forEach(button=>button.addEventListener("click",()=>openGpsDialog(button.dataset.gpsEdit)));
   $$('[data-gps-type]').forEach(button=>button.addEventListener("click",()=>{state.gpsTypeFilter=button.dataset.gpsType;render();}));
+  $$('[data-purchase-new]').forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openPurchaseOrderDialog(null,button.dataset.purchaseNew||null);}));
+  $$('[data-purchase-edit]').forEach(button=>button.addEventListener("click",()=>openPurchaseOrderDialog(button.dataset.purchaseEdit)));
+  $$('[data-purchase-filter]').forEach(button=>button.addEventListener("click",()=>{state.purchaseOrderFilter=button.dataset.purchaseFilter;render();}));
+  $$('[data-purchase-status]').forEach(select=>select.addEventListener("change",()=>updatePurchaseOrderStatus(select.dataset.purchaseStatus,select.value)));
   const localSearch = $("[data-local-search]");
   if (localSearch) localSearch.addEventListener("input", event => { state.query = event.target.value; state.page = 1; render(); requestAnimationFrame(() => { const input = $("[data-local-search]"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); });
   const statusFilter = $("[data-status-filter]");
@@ -686,7 +708,7 @@ function bindViewEvents() {
   $$('[data-document-view]').forEach(button => button.addEventListener("click", () => { state.documentView=button.dataset.documentView; render(); }));
   $$('[data-sort]').forEach(button => button.addEventListener("click", () => { const column=button.dataset.sort; state.sortDir=state.sortBy===column&&state.sortDir==='asc'?'desc':'asc'; state.sortBy=column; state.page=1; render(); }));
   $("[data-page-size]")?.addEventListener("change", event => { state.pageSize=Number(event.target.value); state.page=1; render(); });
-  $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.axiagroFilter="Todos"; state.query = ""; render(); }));
+  $$('[data-axiagro-tab]').forEach(button => button.addEventListener("click", () => { state.axiagroTab = button.dataset.axiagroTab; state.axiagroFilter="Todos"; state.purchaseOrderFilter="Todos"; state.query = ""; render(); }));
   $$('[data-axiagro-filter]').forEach(button => button.addEventListener("click", () => { state.axiagroFilter=button.dataset.axiagroFilter; render(); }));
   $$('[data-axiagro-front]').forEach(button => button.addEventListener("click", () => { state.axiagroFront=button.getAttribute("data-axiagro-front") || "Todas"; state.selectedAxiagroInstallation=null; render(); }));
   $("[data-axiagro-new]")?.addEventListener("click", event => openForm(event.currentTarget.dataset.axiagroNew));
@@ -732,6 +754,37 @@ function saveInstallation(event){
   if(id){const item=installations.find(entry=>entry.id===id);if(item)Object.assign(item,values,{updatedAt:new Date().toISOString()});}
   else {const item={id:`installation-${Date.now()}`,...values,items:[],createdAt:new Date().toISOString()};installations.push(item);state.selectedAxiagroInstallation=item.id;}
   save(AXIAGRO_INSTALLATIONS_KEY,installations); audit(id?"Edição":"Inclusão","axiagroControle",{id:id||state.selectedAxiagroInstallation,frota:values.fleet},"Equipamento AXIAGRO"); $("#installationDialog").close(); toast("Equipamento AXIAGRO salvo."); render();
+}
+
+function openPurchaseOrderDialog(orderId=null,stockId=null){
+  const orders=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]);const order=orders.find(item=>item.id===orderId)||{};const form=$("#purchaseOrderForm");form.reset();form.dataset.orderId=orderId||"";
+  const items=state.data.modules.axiagroEstoque||[];$("#purchaseStockItem").innerHTML=`<option value="">Selecione o item</option>${items.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.equipamento)} · ${escapeHtml(item.modelo||"sem modelo")} · estoque: ${Number(item.quantidade)||0}</option>`).join("")}`;
+  $("#purchaseStockItem").value=order.stockId||stockId||"";$("#purchaseQuantity").value=order.quantity||1;$("#purchaseRequester").value=order.requester||window.FirebaseSync?.user?.email||"";
+  const today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());const todayValue=today.toISOString().slice(0,10);
+  $("#purchaseRequestedAt").value=order.requestedAt||todayValue;$("#purchaseSupplier").value=order.supplier||"";$("#purchaseExternalNumber").value=order.orderNumber||"";$("#purchaseExpectedDate").value=order.expectedDate||"";$("#purchaseNotes").value=order.notes||"";
+  $("#purchaseOrderDialogTitle").textContent=orderId?"Editar pedido de compra":"Registrar pedido de compra";$("#purchaseOrderDialog").showModal();
+}
+
+function savePurchaseOrder(event){
+  event.preventDefault();const form=event.currentTarget;const id=form.dataset.orderId||"";const values=Object.fromEntries(new FormData(form).entries());values.quantity=Math.max(1,Math.floor(Number(values.quantity)||1));
+  const stockItem=findRecord("axiagroEstoque",values.stockId);if(!stockItem)return toast("Selecione um item cadastrado no estoque AXIAGRO.");
+  const orders=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]);const now=new Date().toISOString();let order;
+  if(id){order=orders.find(item=>item.id===id);if(!order||["Recebido","Cancelado"].includes(order.status))return toast("Este pedido já foi encerrado e não pode ser editado.");const changes=Object.entries(values).filter(([field,next])=>String(order[field]??"")!==String(next??"")).map(([field,next])=>({field,before:String(order[field]??""),after:String(next??"")}));Object.assign(order,values,{equipmentName:stockItem.equipamento,model:stockItem.modelo||"",updatedAt:now});audit("Edição","axiagroEstoque",{id:order.id,equipamento:order.equipmentName},`Pedido ${order.requestNumber} atualizado`,changes);}
+  else{order={id:`purchase-${crypto.randomUUID()}`,requestNumber:`AX-${now.slice(0,10).replaceAll("-","")}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,...values,equipmentName:stockItem.equipamento,model:stockItem.modelo||"",status:"Solicitado",createdAt:now,updatedAt:now};orders.push(order);audit("Inclusão","axiagroEstoque",{id:order.id,equipamento:order.equipmentName},`Pedido ${order.requestNumber} · ${order.quantity} unidade(s)`,Object.entries(values).map(([field,value])=>({field,before:"",after:String(value)})));}
+  save(AXIAGRO_PURCHASE_ORDERS_KEY,orders);$("#purchaseOrderDialog").close();toast(id?"Pedido atualizado.":"Pedido de compra registrado.");render();
+}
+
+function updatePurchaseOrderStatus(orderId,nextStatus){
+  const orders=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]);const order=orders.find(item=>item.id===orderId);if(!order)return;
+  if(["Recebido","Cancelado"].includes(order.status))return toast("Este pedido já foi encerrado.");
+  if(!AXIAGRO_ORDER_STAGES.includes(nextStatus))return;
+  if(nextStatus==="Recebido"){
+    const stockItem=findRecord("axiagroEstoque",order.stockId);if(!stockItem)return toast("O item original não existe no estoque. Verifique o cadastro antes de receber.");
+    changeAxiagroStock(order.stockId,Number(order.quantity)||0);order.stockReceivedAt=new Date().toISOString();
+  }
+  const previous=order.status;order.status=nextStatus;order.updatedAt=new Date().toISOString();save(AXIAGRO_PURCHASE_ORDERS_KEY,orders);
+  audit("Atualização","axiagroEstoque",{id:order.id,equipamento:order.equipmentName},`Pedido ${order.requestNumber}: ${previous} → ${nextStatus}`,[{field:"status",before:previous,after:nextStatus}]);
+  toast(nextStatus==="Recebido"?`${order.quantity} unidade(s) recebida(s) e adicionada(s) ao estoque.`:`Andamento atualizado: ${nextStatus}.`);render();
 }
 
 function openGpsDialog(id=null){
@@ -991,6 +1044,13 @@ function deleteSelected() {
 
 function csvValue(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 function exportCsv(module) {
+  if (module === "axiagro" && state.axiagroTab === "pedidos") {
+    const columns=["requestNumber","equipmentName","model","quantity","requester","requestedAt","supplier","orderNumber","expectedDate","status","notes"];
+    const rows=stored(AXIAGRO_PURCHASE_ORDERS_KEY,[]);
+    const labels={requestNumber:"Número interno",equipmentName:"Equipamento",model:"Modelo",quantity:"Quantidade",requester:"Solicitante",requestedAt:"Data do pedido",supplier:"Fornecedor",orderNumber:"Número OC",expectedDate:"Previsão de chegada",status:"Andamento",notes:"Observações"};
+    const csv="\ufeff"+[columns.map(column=>csvValue(labels[column])).join(";"),...rows.map(row=>columns.map(column=>csvValue(row[column])).join(";"))].join("\r\n");
+    download(new Blob([csv],{type:"text/csv;charset=utf-8"}),`pedidos-axiagro-${new Date().toISOString().slice(0,10)}.csv`);return;
+  }
   if (module === "axiagro") module = state.axiagroTab === "controle" ? "axiagroControle" : "axiagroEstoque";
   const config = MODULES[module]; if (!config?.columns) return;
   const rows = module==="gpsMonitoramento" ? stored(GPS_EQUIPMENT_KEY,[]) : filteredRows(module); const columns = config.columns;
@@ -999,7 +1059,7 @@ function exportCsv(module) {
 }
 function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 function backup() {
-  const payload = { version: 3, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), axiagroInstallations: stored(AXIAGRO_INSTALLATIONS_KEY, []), gpsEquipment: stored(GPS_EQUIPMENT_KEY, []), audit: stored(AUDIT_KEY, []) };
+  const payload = { version: 4, generatedAt: new Date().toISOString(), source: state.data.meta, patches: stored(PATCH_KEY, {}), additions: stored(NEW_KEY, {}), deleted: stored(DELETE_KEY, []), teams: stored(TEAMS_KEY, []), axiagroInstallations: stored(AXIAGRO_INSTALLATIONS_KEY, []), axiagroPurchaseOrders: stored(AXIAGRO_PURCHASE_ORDERS_KEY, []), gpsEquipment: stored(GPS_EQUIPMENT_KEY, []), audit: stored(AUDIT_KEY, []) };
   download(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `backup-entressafra-${new Date().toISOString().slice(0, 10)}.json`); toast("Backup dos dados gerado.");
 }
 function toast(message, duration = 3000) { const el = document.createElement("div"); el.className = "toast"; el.textContent = message; $("#toastRegion").append(el); setTimeout(() => el.remove(), duration); }
@@ -1030,6 +1090,7 @@ function bindGlobalEvents() {
   $("#recordForm").addEventListener("submit", persistForm);
   $("#teamForm").addEventListener("submit", saveTeam);
   $("#installationForm").addEventListener("submit", saveInstallation);
+  $("#purchaseOrderForm").addEventListener("submit", savePurchaseOrder);
   $("#gpsEquipmentForm").addEventListener("submit", saveGpsEquipment);
   $("#tacographForm").addEventListener("submit", saveTacograph);
   $("#axiagroItemForm").addEventListener("submit", saveAxiagroItem);

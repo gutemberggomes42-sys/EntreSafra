@@ -147,6 +147,23 @@
     </form>
   </dialog>
 
+  <dialog id="purchaseOrderDialog" class="dialog">
+    <form method="dialog" id="purchaseOrderForm">
+      <div class="dialog-header"><div><span class="eyebrow">AXIAGRO · COMPRAS</span><h2 id="purchaseOrderDialogTitle">Registrar pedido de compra</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body"><div class="form-grid">
+        <div class="form-field wide"><label for="purchaseStockItem">Item do estoque</label><select id="purchaseStockItem" name="stockId" required></select></div>
+        <div class="form-field"><label for="purchaseQuantity">Quantidade</label><input id="purchaseQuantity" name="quantity" type="number" min="1" step="1" required></div>
+        <div class="form-field"><label for="purchaseRequester">Solicitante</label><input id="purchaseRequester" name="requester" required placeholder="Nome do solicitante"></div>
+        <div class="form-field"><label for="purchaseRequestedAt">Data do pedido</label><input id="purchaseRequestedAt" name="requestedAt" type="date" required></div>
+        <div class="form-field"><label for="purchaseExpectedDate">Previsão de chegada</label><input id="purchaseExpectedDate" name="expectedDate" type="date"></div>
+        <div class="form-field"><label for="purchaseSupplier">Fornecedor</label><input id="purchaseSupplier" name="supplier" placeholder="Fornecedor ou cotação pendente"></div>
+        <div class="form-field"><label for="purchaseExternalNumber">Número do pedido / OC</label><input id="purchaseExternalNumber" name="orderNumber" placeholder="Número da ordem de compra"></div>
+        <div class="form-field wide"><label for="purchaseNotes">Observações</label><textarea id="purchaseNotes" name="notes" placeholder="Motivo, urgência ou detalhes do pedido"></textarea></div>
+      </div></div>
+      <div class="dialog-footer"><div class="spacer"></div><button value="cancel" class="secondary-button">Cancelar</button><button type="submit" value="default" class="primary-button">Salvar pedido</button></div>
+    </form>
+  </dialog>
+
   <dialog id="tacographDialog" class="dialog">
     <form method="dialog" id="tacographForm">
       <div class="dialog-header"><div><span class="eyebrow">DOCUMENTAÇÃO · TACÓGRAFO</span><h2>Atualizar aferição</h2></div><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div>
@@ -161,8 +178,8 @@
   </dialog>
 
   <script>window.firebaseSyncReady = new Promise(resolve => window.__resolveFirebaseSync = resolve); window.firebaseAuthReady = new Promise(resolve => window.__resolveFirebaseAuth = resolve);</script>
-  <script type="module" src="firebase-sync.js?v=20261006-4"></script>
+  <script type="module" src="firebase-sync.js?v=20261006-5"></script>
   <script src="data.js?v=20261005-2" defer></script>
-  <script src="app.js?v=20261006-6" defer></script>
+  <script src="app.js?v=20261006-7" defer></script>
 </body>
 </html>

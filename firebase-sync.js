@@ -19,6 +19,7 @@ const KEYS = {
   deleted: "entressafra-v1-deleted",
   teams: "entressafra-v1-teams",
   installations: "entressafra-v1-axiagro-installations",
+  purchaseOrders: "entressafra-v1-axiagro-purchase-orders",
   gpsEquipment: "entressafra-v1-gps-equipments",
   audit: "entressafra-v1-audit",
   deletedTeams: "entressafra-v1-deleted-teams"
@@ -124,6 +125,7 @@ function mergeWorkspace(remote = {}, local = {}) {
     deletedTeams,
     teams: mergeById(remote.teams, local.teams, new Set(deletedTeams)),
     installations: mergeById(remote.installations, local.installations),
+    purchaseOrders: mergeById(remote.purchaseOrders, local.purchaseOrders),
     gpsEquipment: mergeById(remote.gpsEquipment, local.gpsEquipment),
     audit: mergeById(remote.audit, local.audit).sort((a,b) => (Date.parse(b.at || b.createdAt || "") || 0) - (Date.parse(a.at || a.createdAt || "") || 0)).slice(0,300)
   };
